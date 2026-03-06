@@ -19,7 +19,8 @@
 import "DPI-C" function int unsigned real_to_f32 (real r);
 import "DPI-C" function real        f32_to_real (int unsigned bits);
 
-module tb_pc3_hidden_relu_net_mse;
+// used to be tb_pc3_hidden_relu_net_mse
+module tb_final_function;
   `include "tb/tb_logger.sv"
 
   localparam int K0 = 3;

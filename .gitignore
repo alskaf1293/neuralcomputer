@@ -2,3 +2,4 @@ gen_theta_init_pkg.py
 main.py
 
 archive/
+obj_dir/

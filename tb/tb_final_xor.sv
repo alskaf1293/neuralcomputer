@@ -29,7 +29,7 @@
 import "DPI-C" function int unsigned real_to_f32 (real r);
 import "DPI-C" function real        f32_to_real (int unsigned bits);
 
-module tb_pc3_xor;
+module tb_final_xor;
   `include "tb/tb_logger.sv"
 
   // -------------------------
