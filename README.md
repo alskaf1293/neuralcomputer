@@ -68,7 +68,9 @@ sudo apt install -y verilator g++ make bash
 
 Install using Homebrew:
 
+```bash
 brew install verilator
+```
 
 ---
 
@@ -76,12 +78,16 @@ brew install verilator
 
 The repository provides a single command to run all verification tests.
 
+```bash
 ./scripts/test_all.sh
+```
 
 This script runs the following reference simulations:
 
+```bash
 tb/tb_final_function.sv  
 tb/tb_final_xor.sv
+```
 
 Each testbench is compiled with Verilator and executed automatically.
 
@@ -150,7 +156,9 @@ permission denied
 
 run:
 
+```bash
 chmod +x scripts/*.sh
+```
 
 ---
 
@@ -158,7 +166,9 @@ chmod +x scripts/*.sh
 
 Verify that Verilator is installed:
 
+```bash
 verilator --version
+```
 
 If not installed, follow the installation instructions above.
 
