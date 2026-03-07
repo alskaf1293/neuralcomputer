@@ -5,10 +5,6 @@ typedef enum logic [2:0] {
   ACT_SIGMOID  = 3'd3
 } act_kind_e;
 
-// Generic scalar activation wrapper in recFN space.
-// - KIND = ACT_LINEAR  => f(x) = x,     f'(x) = 1
-// - KIND = ACT_RELU    => f(x) = ReLU,  f'(x) = ReLU'
-// - KIND = ACT_TANH => f(x) = tanh, f'(x) = tanh'
 module activation32 #(
     parameter act_kind_e KIND = ACT_RELU,
     parameter int EXP = 8,
