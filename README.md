@@ -18,7 +18,7 @@ The goal is fully reproducible functional simulation using Verilator.
 Clone the repository and run the reference tests.
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/alskaf1293/neuralcomputer/tree/main
 cd mortalcomputer
 ./scripts/test_all.sh
 ```
