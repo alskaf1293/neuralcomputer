@@ -41,12 +41,19 @@ The simulation environment requires:
 - g++
 - bash
 
-Tested environment:
+## Tested Environment
 
-Verilator 5.x  
-g++ 11+  
-Ubuntu 22.04  
-macOS (Homebrew Verilator)
+Reference simulations were verified using:
+
+- Verilator 5.038 (2025-07-08)
+- Apple clang 16.0.0 (g++ compatible)
+- macOS 15.3.1 (arm64)
+
+Only the following external tools are required:
+
+- Verilator
+- a C++ compiler (g++ / clang++)
+- bash
 
 ---
 
