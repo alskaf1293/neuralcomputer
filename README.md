@@ -157,7 +157,9 @@ No additional installation is required.
 
 If you see:
 
+```bash
 permission denied
+```
 
 run:
 
