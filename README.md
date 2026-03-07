@@ -61,9 +61,10 @@ Only the following external tools are required:
 
 ## Ubuntu / Debian
 
+```bash
 sudo apt update
 sudo apt install -y verilator g++ make bash
-
+```
 ## macOS
 
 Install using Homebrew:
@@ -93,7 +94,9 @@ Each testbench is compiled with Verilator and executed automatically.
 
 If all tests pass, the script prints:
 
+```bash
 All reference tests passed.
+```
 
 ---
 
@@ -140,7 +143,9 @@ Floating point operations use the Berkeley HardFloat library.
 
 HardFloat source code is included directly in the repository under:
 
+```bash
 HardFloat/source/
+```
 
 No additional installation is required.
 
