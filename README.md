@@ -1,6 +1,6 @@
-# Mortal Computer RTL Simulation
+# Neural Computer RTL Simulation
 
-This repository contains the SystemVerilog implementation and verification tests for the Mortal Computer architecture.
+This repository contains the SystemVerilog implementation and verification tests for the Neural Computer architecture.
 
 The repository includes:
 
