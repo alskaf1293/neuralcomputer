@@ -17,13 +17,17 @@ The goal is fully reproducible functional simulation using Verilator.
 
 Clone the repository and run the reference tests.
 
+```bash
 git clone <repo-url>
 cd mortalcomputer
 ./scripts/test_all.sh
+```
 
 If everything is working correctly, you should see:
 
+```
 All reference tests passed.
+```
 
 The tests verify the full functional behavior of the system.
 
