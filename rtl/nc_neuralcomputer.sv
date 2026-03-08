@@ -155,17 +155,19 @@ module neuron_core_single_back #(
     assign u_i_eff = (x_set_en ? x_obs : u_i);
 
     // x_i = phi(u_i_eff)
-    logic [RECW-1:0] x_i_act, phi_prime_ui;
+    logic [RECW-1:0] x_i_state;
+    assign x_i_state = u_i_eff;
+
+    logic [RECW-1:0] phi_xi_unused, phi_prime_xi;
 
     activation32 #(
       .KIND(ACT_KIND),
       .EXP(EXP), .SIG(SIG)
-    ) ACT_STATE (
-      .in_rec(u_i_eff),
-      .f_rec(x_i_act),
-      .fp_rec(phi_prime_ui)
+    ) ACT_LOCAL_FEAT (
+      .in_rec(x_i_state),
+      .f_rec(phi_xi_unused),
+      .fp_rec(phi_prime_xi)
     );
-
 
     // ------------- accumulators -----------------------------
     logic [RECW-1:0] mu_acc, eps_i, m_i;
@@ -235,7 +237,7 @@ module neuron_core_single_back #(
     logic [RECW-1:0] back_eff; logic [4:0] mul_back_phi_exc;
 
     mulRecFN #(.expWidth(EXP), .sigWidth(SIG)) MUL_BACK_GATE (
-      .control('0), .a(back_sum), .b(phi_prime_ui),
+      .control('0), .a(back_sum), .b(phi_prime_xi),
       .roundingMode(RM_RNE), .out(back_eff), .exceptionFlags(mul_back_phi_exc)
     );
 
@@ -253,7 +255,7 @@ module neuron_core_single_back #(
     logic [RECW-1:0] err_sub_out; logic [4:0] err_exc;
     addRecFN #(.expWidth(EXP), .sigWidth(SIG)) SUB_ERR (
       .control('0), .subOp(1'b1),
-      .a(x_i_act), .b(mu_acc),
+      .a(x_i_state), .b(mu_acc),
       .roundingMode(RM_RNE), .out(err_sub_out), .exceptionFlags(err_exc)
     );
 
@@ -319,7 +321,7 @@ module neuron_core_single_back #(
 
     // --------- observability outputs ----------
     hf_rec2f32 U_EPS (.in_rec(eps_i),   .out_ieee(eps_ieee));
-    hf_rec2f32 U_XO  (.in_rec(x_i_act), .out_ieee(x_i_ieee));
+    hf_rec2f32 U_XO  (.in_rec(x_i_state), .out_ieee(x_i_ieee));
 
     // Export only true θ’s (0..N-1) on the debug stream
     hf_rec2f32 U_DBG (.in_rec(theta[(dbg_j_int < N) ? dbg_j_int : 0]), .out_ieee(dbg_theta_ieee));
