@@ -55,16 +55,14 @@ module tb_final_function;
   logic [NUM_LAYERS-1:0][32*MAX_K-1:0] x_obs_flat_all;
 
   // hidden ReLU only (matches your working TB pattern)
-  localparam act_kind_e ACT_PRESYN_LUT[NUM_LAYERS] = '{ACT_LINEAR, ACT_RELU,  ACT_LINEAR};
-  localparam act_kind_e ACT_STATE_LUT [NUM_LAYERS] = '{ACT_LINEAR, ACT_RELU,  ACT_LINEAR};
+  localparam act_kind_e ACT_LUT[NUM_LAYERS] = '{ACT_LINEAR, ACT_RELU, ACT_LINEAR};
 
   pc_network_nlayer #(
     .NUM_LAYERS(NUM_LAYERS),
     .MAX_K(MAX_K),
     .K_LUT(K_LUT),
     .M0(0),
-    .ACT_PRESYN_LUT(ACT_PRESYN_LUT),
-    .ACT_STATE_LUT(ACT_STATE_LUT)
+    .ACT_LUT(ACT_LUT)
   ) uut (
     .clk(clk),
     .rst_n(rst_n),
@@ -251,7 +249,7 @@ module tb_final_function;
     mse0 = mse_dataset();
 
     $display("[TB] Initial MSE = %f", mse0);
-    $display("[TB] Train dims 2->8->3 hidden ReLU, MATLAB-matched teacher");
+    $display("[TB] Train dims 2->4->3 hidden ReLU, MATLAB-matched teacher");
 
     csv_row($sformatf("%0d,%f", 0, mse0));
 

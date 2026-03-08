@@ -94,16 +94,14 @@ module tb_final_xor;
   // Activations:
   // layer index: [0]=bottom (output), [1]=hidden, [2]=top (input)
   // Now: top LINEAR + hidden TANH + bottom LINEAR
-  localparam act_kind_e ACT_PRESYN_LUT[NUM_LAYERS] = '{ACT_LINEAR, ACT_TANH,  ACT_LINEAR};
-  localparam act_kind_e ACT_STATE_LUT [NUM_LAYERS] = '{ACT_LINEAR, ACT_TANH,  ACT_LINEAR};
+  localparam act_kind_e ACT_LUT[NUM_LAYERS] = '{ACT_LINEAR, ACT_TANH, ACT_LINEAR};
 
   pc_network_nlayer #(
     .NUM_LAYERS(NUM_LAYERS),
     .MAX_K(MAX_K),
     .K_LUT(K_LUT),
     .M0(0),
-    .ACT_PRESYN_LUT(ACT_PRESYN_LUT),
-    .ACT_STATE_LUT(ACT_STATE_LUT),
+    .ACT_LUT(ACT_LUT),
     .EXP(EXP),
     .SIG(SIG)
   ) uut (

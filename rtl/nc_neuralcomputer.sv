@@ -65,8 +65,7 @@ module neuron_core_single_back #(
     parameter bit CLAMP_HARD = 1'b0,
 
     // Activation choices
-    parameter act_kind_e ACT_PRESYN_KIND = ACT_RELU,   // φ for presynaptic x_j
-    parameter act_kind_e ACT_STATE_KIND  = ACT_RELU,   // φ for state x_i
+    parameter act_kind_e ACT_KIND = ACT_RELU,
 
     // N = dim(layer l+1) [presynaptic to this neuron, not counting bias]
     // M = dim(layer l-1) [back inputs coming into this neuron]
@@ -159,7 +158,7 @@ module neuron_core_single_back #(
     logic [RECW-1:0] x_i_act, phi_prime_ui;
 
     activation32 #(
-      .KIND(ACT_STATE_KIND),
+      .KIND(ACT_KIND),
       .EXP(EXP), .SIG(SIG)
     ) ACT_STATE (
       .in_rec(u_i_eff),
@@ -203,7 +202,7 @@ module neuron_core_single_back #(
     logic [RECW-1:0] xj_act_raw, xj_actp_unused;
 
     activation32 #(
-      .KIND(ACT_PRESYN_KIND),
+      .KIND(ACT_KIND),
       .EXP(EXP), .SIG(SIG)
     ) ACT_PRE (
       .in_rec(xj_in_feat),
@@ -512,8 +511,7 @@ module pc_layer #(
   parameter bit CLAMP_HARD_THIS_LAYER = 1'b0,
 
   // Activation choices for this layer
-  parameter act_kind_e ACT_PRESYN_THIS_LAYER = ACT_RELU,
-  parameter act_kind_e ACT_STATE_THIS_LAYER  = ACT_RELU,
+  parameter act_kind_e ACT_THIS_LAYER = ACT_RELU,
 
   parameter logic [31:0] THETA_PRESET_IEEE_PER_NEURON [K][N] = '{default:'{default:32'h0000_0000}},
   parameter logic [31:0] X_INIT_IEEE_THIS_LAYER = 32'h0000_0000
@@ -616,8 +614,7 @@ module pc_layer #(
 
       neuron_core_single_back #(
         .CLAMP_HARD(CLAMP_HARD_THIS_LAYER),
-        .ACT_PRESYN_KIND(ACT_PRESYN_THIS_LAYER),
-        .ACT_STATE_KIND(ACT_STATE_THIS_LAYER),
+        .ACT_KIND(ACT_THIS_LAYER),
         .N(N), .M(M), .EXP(EXP), .SIG(SIG),
         .X_I_INIT_IEEE(X_INIT_IEEE_THIS_LAYER),
         .FREEZE_BIAS(1'b0)
@@ -706,8 +703,7 @@ module pc_network_nlayer #(
     parameter int M0 = 0,
 
     // Per-layer activation kinds
-    parameter act_kind_e ACT_PRESYN_LUT[NUM_LAYERS] = '{default:ACT_RELU},
-    parameter act_kind_e ACT_STATE_LUT [NUM_LAYERS] = '{default:ACT_RELU},
+    parameter act_kind_e ACT_LUT[NUM_LAYERS] = '{default:ACT_RELU},
 
     parameter int EXP = 8,
     parameter int SIG = 24
@@ -761,8 +757,7 @@ module pc_network_nlayer #(
         
         // parameter act_kind_e ACT_PRESYN_LUT[NUM_LAYERS] = '{default:ACT_RELU},
         // parameter act_kind_e ACT_STATE_LUT [NUM_LAYERS] = '{default:ACT_RELU},
-        localparam act_kind_e ACT_PRESYN_THIS = ACT_PRESYN_LUT[ul];
-        localparam act_kind_e ACT_STATE_THIS  = ACT_STATE_LUT[ul];
+        localparam act_kind_e ACT_THIS = ACT_LUT[ul];
 
         // ---- local, exactly-sized signals matching pc_layer ports ----
         logic [K_CUR-1:0]           x_set_en_vec_l;
@@ -830,8 +825,7 @@ module pc_network_nlayer #(
             .EXP(EXP),
             .SIG(SIG),
             .CLAMP_HARD_THIS_LAYER(CLAMP_HARD_THIS),
-            .ACT_PRESYN_THIS_LAYER(ACT_PRESYN_THIS),
-            .ACT_STATE_THIS_LAYER(ACT_STATE_THIS),
+            .ACT_THIS_LAYER(ACT_THIS),
             .THETA_PRESET_IEEE_PER_NEURON(THETA_L0),
             .X_INIT_IEEE_THIS_LAYER(X_INIT_SEED)
           ) L (
@@ -867,8 +861,7 @@ module pc_network_nlayer #(
             .EXP(EXP),
             .SIG(SIG),
             .CLAMP_HARD_THIS_LAYER(CLAMP_HARD_THIS),
-            .ACT_PRESYN_THIS_LAYER(ACT_PRESYN_THIS),
-            .ACT_STATE_THIS_LAYER(ACT_STATE_THIS),
+            .ACT_THIS_LAYER(ACT_THIS),
             .THETA_PRESET_IEEE_PER_NEURON(THETA_L1),
             .X_INIT_IEEE_THIS_LAYER(X_INIT_SEED)
           ) L (
@@ -903,8 +896,7 @@ module pc_network_nlayer #(
             .EXP(EXP),
             .SIG(SIG),
             .CLAMP_HARD_THIS_LAYER(CLAMP_HARD_THIS),
-            .ACT_PRESYN_THIS_LAYER(ACT_PRESYN_THIS),
-            .ACT_STATE_THIS_LAYER(ACT_STATE_THIS),
+            .ACT_THIS_LAYER(ACT_THIS),
 
             // For ul==2 (top), N_CUR is likely 0, so this param won’t be used.
             // For safety, pass zeros. You can later add THETA_L2 if you ever need it.
