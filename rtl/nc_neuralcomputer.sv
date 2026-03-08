@@ -149,14 +149,9 @@ module neuron_core_single_back #(
     hf_f2rec32 U_XOBS (.in_ieee(x_obs_ieee), .out_rec(x_obs));
 
     // ------------- pre-activation state and clamp -------------
-    logic [RECW-1:0] u_i, u_i_init_rec, u_i_eff;
-    hf_f2rec32 U_UI0 (.in_ieee(X_I_INIT_IEEE), .out_rec(u_i_init_rec)); // reuse init param
-
-    assign u_i_eff = (x_set_en ? x_obs : u_i);
-
-    // x_i = phi(u_i_eff)
-    logic [RECW-1:0] x_i_state;
-    assign x_i_state = u_i_eff;
+    logic [RECW-1:0] x_i, x_i_init_rec, x_i_eff;
+    hf_f2rec32 U_XI0 (.in_ieee(X_I_INIT_IEEE), .out_rec(x_i_init_rec));
+    assign x_i_eff = (x_set_en ? x_obs : x_i);
 
     logic [RECW-1:0] phi_xi_unused, phi_prime_xi;
 
@@ -164,7 +159,7 @@ module neuron_core_single_back #(
       .KIND(ACT_KIND),
       .EXP(EXP), .SIG(SIG)
     ) ACT_LOCAL_FEAT (
-      .in_rec(x_i_state),
+      .in_rec(x_i_eff),
       .f_rec(phi_xi_unused),
       .fp_rec(phi_prime_xi)
     );
@@ -255,7 +250,7 @@ module neuron_core_single_back #(
     logic [RECW-1:0] err_sub_out; logic [4:0] err_exc;
     addRecFN #(.expWidth(EXP), .sigWidth(SIG)) SUB_ERR (
       .control('0), .subOp(1'b1),
-      .a(x_i_state), .b(mu_acc),
+      .a(x_i_eff), .b(mu_acc),
       .roundingMode(RM_RNE), .out(err_sub_out), .exceptionFlags(err_exc)
     );
 
@@ -279,7 +274,7 @@ module neuron_core_single_back #(
 
     mulAddRecFN #(.expWidth(EXP), .sigWidth(SIG)) FMA_STATE (
       .control('0), .op(2'b00),
-      .a(gamma), .b(sub_back_minus_eps), .c(u_i),
+      .a(gamma), .b(sub_back_minus_eps), .c(x_i),
       .roundingMode(RM_RNE), .out(state_out), .exceptionFlags(state_exc)
     );
 
@@ -321,7 +316,7 @@ module neuron_core_single_back #(
 
     // --------- observability outputs ----------
     hf_rec2f32 U_EPS (.in_rec(eps_i),   .out_ieee(eps_ieee));
-    hf_rec2f32 U_XO  (.in_rec(x_i_state), .out_ieee(x_i_ieee));
+    hf_rec2f32 U_XO  (.in_rec(x_i_eff), .out_ieee(x_i_ieee));
 
     // Export only true θ’s (0..N-1) on the debug stream
     hf_rec2f32 U_DBG (.in_rec(theta[(dbg_j_int < N) ? dbg_j_int : 0]), .out_ieee(dbg_theta_ieee));
@@ -369,7 +364,7 @@ module neuron_core_single_back #(
         for (int k=0; k<N; k++) x_col_ieee[k]   <= 32'h0000_0000;
         for (int k=0; k<N; k++) back_vec_rec[k] <= rec_zero;
 
-        u_i <= u_i_init_rec;
+        x_i <= x_i_init_rec;
       end else begin
         // per-cycle defaults
         done_o           <= 1'b0;
@@ -452,8 +447,8 @@ module neuron_core_single_back #(
 
           // state update (or hard clamp) and emit single-cycle done_o
           S_STATE: begin
-            if (CLAMP_HARD && x_set_en) u_i <= x_obs;
-            else                        u_i <= state_out;
+            if (CLAMP_HARD && x_set_en) x_i <= x_obs;
+            else                        x_i <= state_out;
             busy_o <= 1'b0;
             done_o <= 1'b1;
             st     <= S_IDLE;

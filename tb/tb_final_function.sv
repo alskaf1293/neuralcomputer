@@ -150,8 +150,8 @@ module tb_final_function;
 
   task automatic do_tick();
     int guard=0;
-    @(posedge clk) start_tick <= 1;
-    @(posedge clk) start_tick <= 0;
+    @(posedge clk) start_tick = 1;
+    @(posedge clk) start_tick = 0;
     while (!done_edge) begin
       @(posedge clk);
       guard++;
