@@ -103,23 +103,38 @@ All reference tests passed.
 # Repository Structure
 
 .
-├── rtl/                 RTL modules  
-│  
-├── tb/                  SystemVerilog testbenches  
-│   ├── tb_final_function.sv  
-│   ├── tb_final_xor.sv  
-│   └── dpi_casts.cc  
-│  
-├── HardFloat/           Berkeley HardFloat library  
-│  
-├── scripts/             Simulation scripts  
-│   ├── check_env.sh  
-│   ├── run_test.sh  
-│   └── test_all.sh  
-│  
-├── vlt                  Verilator wrapper script  
-│  
-└── README.md  
+├── rtl/                         RTL modules
+│   ├── activation_relu32.sv
+│   ├── fp_add32_hf.sv
+│   ├── hf_mac32.sv
+│   ├── nc_neuralcomputer.sv
+│   └── includes/
+│
+├── tb/                          SystemVerilog testbenches
+│   ├── tb_final_function.sv
+│   ├── tb_final_xor.sv
+│   ├── tb_logger.sv
+│   └── dpi_casts.cc
+│
+├── scripts/                     Simulation helper scripts
+│   ├── check_env.sh
+│   ├── run_test.sh
+│   └── test_all.sh
+│
+├── HardFloat/                   Berkeley HardFloat library
+│   ├── doc/
+│   ├── source/
+│   ├── test/
+│   ├── COPYING.txt
+│   ├── README.html
+│   └── README.txt
+│
+├── runs/                        Simulation outputs (generated)
+│
+├── obj_dir/                     Verilator build artifacts (generated)
+│
+├── .gitignore
+└── README.md
 
 ---
 

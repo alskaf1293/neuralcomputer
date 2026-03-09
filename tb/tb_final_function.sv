@@ -96,37 +96,48 @@ module tb_final_function;
     int s;
 
     // zero everything
-    for (int i=0;i<K1;i++) for (int j=0;j<K2;j++) B_gt[i][j]=0.0;
-    for (int i=0;i<K0;i++) for (int j=0;j<K1;j++) A_gt[i][j]=0.0;
+    for (int i = 0; i < K1; i++)
+      for (int j = 0; j < K2; j++)
+        B_gt[i][j] = 0.0;
 
-    // MATLAB teacher:
-    // B_gt(1,1)=1; B_gt(2,2)=1;
-    B_gt[0][0] = 1.0;
-    B_gt[1][1] = 1.0;
+    for (int i = 0; i < K0; i++)
+      for (int j = 0; j < K1; j++)
+        A_gt[i][j] = 0.0;
 
-    // A_gt(:,1:2) as given
-    A_gt[0][0] =  1.00;  A_gt[0][1] = -0.50;
-    A_gt[1][0] = -0.80;  A_gt[1][1] =  0.90;
-    A_gt[2][0] =  0.60;  A_gt[2][1] =  0.75;
+    // --------------------------------------------------
+    // Non-trivial but well-conditioned teacher
+    // K2 = 2, K1 = 4, K0 = 3
+    // --------------------------------------------------
+    B_gt[0][0] =  1.00;  B_gt[0][1] = -0.20;
+    B_gt[1][0] = -0.15;  B_gt[1][1] =  0.95;
+    B_gt[2][0] =  0.70;  B_gt[2][1] =  0.25;
+    B_gt[3][0] =  0.20;  B_gt[3][1] =  0.80;
+
+    A_gt[0][0] =  0.90;  A_gt[0][1] = -0.45;  A_gt[0][2] =  0.30;  A_gt[0][3] =  0.00;
+    A_gt[1][0] = -0.70;  A_gt[1][1] =  0.85;  A_gt[1][2] =  0.00;  A_gt[1][3] =  0.25;
+    A_gt[2][0] =  0.50;  A_gt[2][1] =  0.60;  A_gt[2][2] = -0.20;  A_gt[2][3] =  0.35;
 
     for (s = 0; s < NUM_SAMPLES; s++) begin
-      // MATLAB:
-      // x2(:,s) = [ -1.2 + 2.4*(s-1)/(N-1) ; 1.1*sin(1.3*(s-1)) ]
-      x0 = -1.2 + 2.4 * real'(s) / real'(NUM_SAMPLES-1);
+      // Same dataset as before
+      x0 = -1.2 + 2.4 * real'(s) / real'(NUM_SAMPLES - 1);
       x1 =  1.1 * $sin(1.3 * real'(s));
 
       x2_samples[s][0] = x0;
       x2_samples[s][1] = x1;
 
       // h = ReLU(B_gt * x)
-      for (int i=0;i<K1;i++) begin
-        h[i] = relu_r(B_gt[i][0]*x0 + B_gt[i][1]*x1);
+      for (int i = 0; i < K1; i++) begin
+        real acc = 0.0;
+        for (int j = 0; j < K2; j++)
+          acc += B_gt[i][j] * x2_samples[s][j];
+        h[i] = relu_r(acc);
       end
 
       // y = A_gt * h
-      for (int o=0;o<K0;o++) begin
+      for (int o = 0; o < K0; o++) begin
         real acc = 0.0;
-        for (int i=0;i<K1;i++) acc += A_gt[o][i]*h[i];
+        for (int i = 0; i < K1; i++)
+          acc += A_gt[o][i] * h[i];
         y_targets[s][o] = acc;
       end
     end
