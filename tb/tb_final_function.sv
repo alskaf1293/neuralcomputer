@@ -1,16 +1,9 @@
 // ======================================================================
-// tb_pc3_2_8_3_hidden_relu_net_mse.sv
+// tb_final_function.sv
 //
-// dims: top->hidden->bottom = 2 -> 8 -> 3
-// K_LUT bottom->top = [3, 8, 2]
+// dims: top->hidden->bottom = 2 -> 4 -> 3
+// K_LUT bottom->top = [3, 4, 2]
 // hidden ReLU; top/bottom linear
-//
-// Teacher matches MATLAB:
-//   B_gt(1,1)=1, B_gt(2,2)=1, rest 0   (here: rows 0 and 1)
-//   A_gt(:,1:2) = [[ 1.00 -0.50], [-0.80 0.90], [0.60 0.75]], rest 0
-//
-// Dataset matches MATLAB:
-//   x(:,s) = [ -1.2 + 2.4*(s-1)/(N-1) ; 1.1*sin(1.3*(s-1)) ]
 // ======================================================================
 
 `timescale 1ns/1ps
@@ -19,7 +12,6 @@
 import "DPI-C" function int unsigned real_to_f32 (real r);
 import "DPI-C" function real        f32_to_real (int unsigned bits);
 
-// used to be tb_pc3_hidden_relu_net_mse
 module tb_final_function;
   `include "tb/tb_logger.sv"
 
@@ -39,7 +31,14 @@ module tb_final_function;
   localparam int EVAL_SETTLE_TICKS      = 2000;
   localparam int EPOCHS                = 25;
 
-  localparam int NUM_SAMPLES = 10;
+  localparam int NX0 = 6;
+  localparam int NX1 = 6;
+  localparam int NUM_SAMPLES = NX0 * NX1;
+
+  localparam real X0_LOW  = -1.2;
+  localparam real X0_HIGH =  1.2;
+  localparam real X1_LOW  = -1.1;
+  localparam real X1_HIGH =  1.1;
 
   // clock/reset
   logic clk, rst_n;
@@ -90,10 +89,11 @@ module tb_final_function;
     return (z > 0.0) ? z : 0.0;
   endfunction
 
-  task automatic build_dataset();
+    task automatic build_dataset();
     real x0, x1;
     real h[K1];
     int s;
+    int ix0, ix1;
 
     // zero everything
     for (int i = 0; i < K1; i++)
@@ -117,28 +117,36 @@ module tb_final_function;
     A_gt[1][0] = -0.70;  A_gt[1][1] =  0.85;  A_gt[1][2] =  0.00;  A_gt[1][3] =  0.25;
     A_gt[2][0] =  0.50;  A_gt[2][1] =  0.60;  A_gt[2][2] = -0.20;  A_gt[2][3] =  0.35;
 
-    for (s = 0; s < NUM_SAMPLES; s++) begin
-      // Same dataset as before
-      x0 = -1.2 + 2.4 * real'(s) / real'(NUM_SAMPLES - 1);
-      x1 =  1.1 * $sin(1.3 * real'(s));
+    s = 0;
+    for (ix0 = 0; ix0 < NX0; ix0++) begin
+      for (ix1 = 0; ix1 < NX1; ix1++) begin
 
-      x2_samples[s][0] = x0;
-      x2_samples[s][1] = x1;
+        if (NX0 == 1) x0 = 0.5 * (X0_LOW + X0_HIGH);
+        else          x0 = X0_LOW + (X0_HIGH - X0_LOW) * real'(ix0) / real'(NX0 - 1);
 
-      // h = ReLU(B_gt * x)
-      for (int i = 0; i < K1; i++) begin
-        real acc = 0.0;
-        for (int j = 0; j < K2; j++)
-          acc += B_gt[i][j] * x2_samples[s][j];
-        h[i] = relu_r(acc);
-      end
+        if (NX1 == 1) x1 = 0.5 * (X1_LOW + X1_HIGH);
+        else          x1 = X1_LOW + (X1_HIGH - X1_LOW) * real'(ix1) / real'(NX1 - 1);
 
-      // y = A_gt * h
-      for (int o = 0; o < K0; o++) begin
-        real acc = 0.0;
-        for (int i = 0; i < K1; i++)
-          acc += A_gt[o][i] * h[i];
-        y_targets[s][o] = acc;
+        x2_samples[s][0] = x0;
+        x2_samples[s][1] = x1;
+
+        // h = ReLU(B_gt * x)
+        for (int i = 0; i < K1; i++) begin
+          real acc = 0.0;
+          for (int j = 0; j < K2; j++)
+            acc += B_gt[i][j] * x2_samples[s][j];
+          h[i] = relu_r(acc);
+        end
+
+        // y = A_gt * h
+        for (int o = 0; o < K0; o++) begin
+          real acc = 0.0;
+          for (int i = 0; i < K1; i++)
+            acc += A_gt[o][i] * h[i];
+          y_targets[s][o] = acc;
+        end
+
+        s++;
       end
     end
   endtask

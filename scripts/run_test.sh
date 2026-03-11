@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-TB="${1:?usage: ./scripts/run_test.sh tb/<test>.sv <top_module>}"
-TOP="${2:?usage: ./scripts/run_test.sh tb/<test>.sv <top_module>}"
+TB="${1:?usage: ./scripts/run_test.sh tb/<test>.sv <top_module> [verilator args...] -- [sim args...]}"
+TOP="${2:?usage: ./scripts/run_test.sh tb/<test>.sv <top_module> [verilator args...] -- [sim args...]}"
+shift 2
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 "$ROOT/scripts/check_env.sh"
 cd "$ROOT"
+
+VERILATOR_EXTRA=()
+SIM_EXTRA=()
+SEEN_SEP=0
+
+for arg in "$@"; do
+  if [[ "$arg" == "--" ]]; then
+    SEEN_SEP=1
+    continue
+  fi
+
+  if [[ "$SEEN_SEP" -eq 0 ]]; then
+    VERILATOR_EXTRA+=("$arg")
+  else
+    SIM_EXTRA+=("$arg")
+  fi
+done
 
 COMMON_FLAGS=(
   -sv --binary --timing
@@ -43,9 +61,10 @@ COMMON_SRCS=(
 DPI="$ROOT/tb/dpi_casts.cc"
 
 verilator "${COMMON_FLAGS[@]}" \
+  "${VERILATOR_EXTRA[@]}" \
   "${COMMON_SRCS[@]}" \
   "$ROOT/$TB" \
   --top-module "$TOP" \
   --exe "$DPI"
 
-"$ROOT/obj_dir/V${TOP}"
+"$ROOT/obj_dir/V${TOP}" "${SIM_EXTRA[@]}"
