@@ -39,7 +39,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
   -- \
   +CSV=runs/scale_8_16_8.csv \
   +NX0=2 +NX1=2 +NX2=2 +NX3=2 +NX4=2 +NX5=2 +NX6=2 +NX7=2 \
-  +ALPHA=0.05 +GAMMA=0.10 \
+  +ALPHA=0.02 +GAMMA=0.05 \
   +INFER_TICKS=200 +LEARN_TICKS=20 +EVAL_TICKS=300 +EPOCHS=25 \
   +CONV_MSE=1e-2
 
