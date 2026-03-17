@@ -214,10 +214,8 @@ module tb_scale_function #(
     // -----------------------------
     // Plusargs overrides
     // -----------------------------
-    ok_real = 0.0;
     if ($value$plusargs("ALPHA=%f", ok_real)) ALPHA_R = ok_real;
     if ($value$plusargs("GAMMA=%f", ok_real)) GAMMA_R = ok_real;
-    if ($value$plusargs("CONV_MSE=%f", ok_real)) CONV_MSE_THRESH = ok_real;
 
     ok_int = 0;
     if ($value$plusargs("INFER_TICKS=%d", ok_int)) INFER_TICKS_PER_SAMPLE = ok_int;
@@ -552,7 +550,6 @@ module tb_scale_function #(
     $display("[TB] LEARN_TICKS_PER_SAMPLE = %0d", LEARN_TICKS_PER_SAMPLE);
     $display("[TB] EVAL_SETTLE_TICKS = %0d", EVAL_SETTLE_TICKS);
     $display("[TB] EPOCHS = %0d", EPOCHS);
-    $display("[TB] CONV_MSE_THRESH = %0.6f", CONV_MSE_THRESH);
     $display("[TB] CSV_PATH = %s", CSV_PATH);
     for (int j = 0; j < K2; j++) begin
       $display("[TB] dim %0d : NX=%0d  range=[%0.4f,%0.4f]",
