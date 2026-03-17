@@ -1,11 +1,11 @@
 // ======================================================================
-// tb_pc3_two_two_one_input_linear_hidden_tanh_biased_net_mse.sv
+// tb_pc3_tanh_reg.sv
 //
 // 3-layer pc_network_nlayer:
 //   K0=1 (bottom/output), K1=2 (hidden), K2=2 (top/input)
 //
 // Activations (per layer index: [0]=bottom, [1]=hidden, [2]=top):
-//   - Top/input:   LINEAR   (no nonlinearity on the observed inputs)
+//   - Top/input:   LINEAR
 //   - Hidden:      TANH
 //   - Bottom/out:  LINEAR
 //
@@ -29,7 +29,7 @@
 import "DPI-C" function int unsigned real_to_f32 (real r);
 import "DPI-C" function real        f32_to_real (int unsigned bits);
 
-module tb_final_xor;
+module tb_pc3_tanh_reg;
   `include "tb/tb_logger.sv"
 
   // -------------------------
@@ -311,7 +311,7 @@ module tb_final_xor;
     @(posedge rst_n);
     repeat (5) @(posedge clk);
 
-    csv_open("runs/pc3_xor.csv", "epoch,mse");
+    csv_open("runs/pc3_tanh_reg.csv", "epoch,mse");
 
     mse0 = mse_dataset();
     $display("[TB] Initial MSE = %f", mse0);
