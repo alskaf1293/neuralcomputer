@@ -51,8 +51,6 @@ module tb_scale_function #(
   int EVAL_SETTLE_TICKS;
   int EPOCHS;
 
-  real CONV_MSE_THRESH;
-
   string CSV_PATH;
 
   // --------------------------------------------------------------------
@@ -170,8 +168,6 @@ module tb_scale_function #(
     LEARN_TICKS_PER_SAMPLE = 20;
     EVAL_SETTLE_TICKS      = 2000;
     EPOCHS                 = 25;
-
-    CONV_MSE_THRESH = 1.0e-2;
 
     CSV_PATH = "runs/scale.csv";
 
@@ -582,17 +578,12 @@ module tb_scale_function #(
   // --------------------------------------------------------------------
   initial begin
     real mse0, msep;
-    integer conv_epoch;
-    integer conv_ticks;
 
     start_tick = 1'b0;
     clear_clamps();
 
     load_runtime_config();
     build_dataset();
-
-    conv_epoch = -1;
-    conv_ticks = -1;
 
     wait(rst_n);
     repeat (5) @(posedge clk);
@@ -607,11 +598,6 @@ module tb_scale_function #(
     print_teacher_summary();
 
     csv_row($sformatf("%0d,%f", 0, mse0));
-
-    if ((conv_epoch < 0) && (mse0 < CONV_MSE_THRESH)) begin
-      conv_epoch = 0;
-      conv_ticks = 0;
-    end
 
     for (int ep = 0; ep < EPOCHS; ep++) begin
       for (int s = 0; s < NUM_SAMPLES; s++) begin
@@ -628,24 +614,7 @@ module tb_scale_function #(
 
       csv_row($sformatf("%0d,%f", ep+1, msep));
       $display("[TB] Epoch %0d  MSE = %f", ep+1, msep);
-
-      if ((conv_epoch < 0) && (msep < CONV_MSE_THRESH)) begin
-        conv_epoch = ep + 1;
-        conv_ticks = (ep + 1) * NUM_SAMPLES
-                   * (INFER_TICKS_PER_SAMPLE + LEARN_TICKS_PER_SAMPLE);
-      end
     end
-
-    $display("[TB] ==================================================");
-    if (conv_epoch >= 0) begin
-      $display("[TB] Converged.");
-      $display("[TB] Convergence epoch      = %0d", conv_epoch);
-      $display("[TB] Ticks to convergence  = %0d", conv_ticks);
-    end else begin
-      $display("[TB] Did not reach convergence threshold within %0d epochs.", EPOCHS);
-    end
-    $display("[TB] Final dataset MSE = %f", msep);
-    $display("[TB] ==================================================");
 
     csv_close();
     $finish;
