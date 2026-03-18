@@ -37,7 +37,7 @@ The tests verify the full functional behavior of the system.
 
 The simulation environment requires:
 
-- Verilator (5.x recommended)
+- Verilator (5.x required)
 - g++
 - bash
 
@@ -45,7 +45,7 @@ The simulation environment requires:
 
 Reference simulations were verified using:
 
-- Verilator 5.038 (2025-07-08)
+- Verilator 5.038
 - Apple clang 16.0.0 (g++ compatible)
 - macOS 15.3.1 (arm64)
 
@@ -82,14 +82,6 @@ The repository provides a single command to run all verification tests.
 ```bash
 ./scripts/test_all.sh
 ```
-
-This script runs the following reference simulations:
-
-```bash
-tb/tb_final_function.sv  
-tb/tb_final_xor.sv
-```
-
 Each testbench is compiled with Verilator and executed automatically.
 
 If all tests pass, the script prints:
@@ -97,44 +89,6 @@ If all tests pass, the script prints:
 ```bash
 All reference tests passed.
 ```
-
----
-
-# Repository Structure
-
-.
-├── rtl/                         RTL modules
-│   ├── activation_relu32.sv
-│   ├── fp_add32_hf.sv
-│   ├── hf_mac32.sv
-│   ├── nc_neuralcomputer.sv
-│   └── includes/
-│
-├── tb/                          SystemVerilog testbenches
-│   ├── tb_final_function.sv
-│   ├── tb_final_xor.sv
-│   ├── tb_logger.sv
-│   └── dpi_casts.cc
-│
-├── scripts/                     Simulation helper scripts
-│   ├── check_env.sh
-│   ├── run_test.sh
-│   └── test_all.sh
-│
-├── HardFloat/                   Berkeley HardFloat library
-│   ├── doc/
-│   ├── source/
-│   ├── test/
-│   ├── COPYING.txt
-│   ├── README.html
-│   └── README.txt
-│
-├── runs/                        Simulation outputs (generated)
-│
-├── obj_dir/                     Verilator build artifacts (generated)
-│
-├── .gitignore
-└── README.md
 
 ---
 
