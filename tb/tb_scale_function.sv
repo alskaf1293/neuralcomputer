@@ -54,26 +54,17 @@ module tb_scale_function #(
   string CSV_PATH;
 
   // --------------------------------------------------------------------
-  // Grid configuration
+  // Dataset configuration
   //
-  // nx_lut[j] = number of grid points along top/input dimension j
-  //
-  // Defaults:
-  //   K2=2 -> 6x6 = 36
-  //   K2=4 -> 3^4 = 81
-  //   K2=8 -> 2^8 = 256
-  //
-  // These can also be overridden by plusargs:
-  //   +NX0=...
-  //   +NX1=...
-  //   ...
-  //   +NX7=...
+  // Uniform random sampling over per-dimension ranges [x_low[j], x_high[j]].
+  // Override sample count with +N_SAMPLES=N and random seed with +SEED=N.
+  // Override individual dimension bounds with +X{j}_LOW=N / +X{j}_HIGH=N.
   // --------------------------------------------------------------------
-  int nx_lut [0:MAX_K-1];
   real x_low [0:MAX_K-1];
   real x_high[0:MAX_K-1];
 
   int NUM_SAMPLES;
+  int RAND_SEED;
 
   // Statically allocate to the maximum supported dataset size.
   //
@@ -172,25 +163,10 @@ module tb_scale_function #(
     CSV_PATH = "runs/scale.csv";
 
     // -----------------------------
-    // Default grid sizes
+    // Dataset configuration
     // -----------------------------
-    for (int j = 0; j < MAX_K; j++) begin
-      nx_lut[j] = 1;
-    end
-
-    if (K2 == 2) begin
-      nx_lut[0] = 6; nx_lut[1] = 6;
-    end
-    else if (K2 == 4) begin
-      nx_lut[0] = 3; nx_lut[1] = 3; nx_lut[2] = 3; nx_lut[3] = 3;
-    end
-    else if (K2 == 8) begin
-      nx_lut[0] = 2; nx_lut[1] = 2; nx_lut[2] = 2; nx_lut[3] = 2;
-      nx_lut[4] = 2; nx_lut[5] = 2; nx_lut[6] = 2; nx_lut[7] = 2;
-    end
-    else begin
-      for (int j = 0; j < K2; j++) nx_lut[j] = 2;
-    end
+    NUM_SAMPLES = 256;
+    RAND_SEED   = 0;
 
     // -----------------------------
     // Default coordinate ranges
@@ -221,15 +197,9 @@ module tb_scale_function #(
 
     void'($value$plusargs("CSV=%s", CSV_PATH));
 
-    // Grid sizes
-    ok_int = 0; if ($value$plusargs("NX0=%d", ok_int)) nx_lut[0] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX1=%d", ok_int)) nx_lut[1] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX2=%d", ok_int)) nx_lut[2] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX3=%d", ok_int)) nx_lut[3] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX4=%d", ok_int)) nx_lut[4] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX5=%d", ok_int)) nx_lut[5] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX6=%d", ok_int)) nx_lut[6] = ok_int;
-    ok_int = 0; if ($value$plusargs("NX7=%d", ok_int)) nx_lut[7] = ok_int;
+    // Dataset configuration
+    ok_int = 0; if ($value$plusargs("N_SAMPLES=%d", ok_int)) NUM_SAMPLES = ok_int;
+    ok_int = 0; if ($value$plusargs("SEED=%d",      ok_int)) RAND_SEED   = ok_int;
 
     // Per-dimension ranges
     ok_real = 0.0; if ($value$plusargs("X0_LOW=%f",  ok_real)) x_low[0]  = ok_real;
@@ -248,17 +218,6 @@ module tb_scale_function #(
     ok_real = 0.0; if ($value$plusargs("X6_HIGH=%f", ok_real)) x_high[6] = ok_real;
     ok_real = 0.0; if ($value$plusargs("X7_LOW=%f",  ok_real)) x_low[7]  = ok_real;
     ok_real = 0.0; if ($value$plusargs("X7_HIGH=%f", ok_real)) x_high[7] = ok_real;
-
-    // -----------------------------
-    // Compute total sample count
-    // -----------------------------
-    NUM_SAMPLES = 1;
-    for (int j = 0; j < K2; j++) begin
-      if (nx_lut[j] <= 0) begin
-        $fatal(1, "[TB] NX%0d must be >= 1, got %0d", j, nx_lut[j]);
-      end
-      NUM_SAMPLES *= nx_lut[j];
-    end
 
     if (NUM_SAMPLES > MAX_SAMPLES) begin
       $fatal(1, "[TB] NUM_SAMPLES=%0d exceeds MAX_SAMPLES=%0d. Increase MAX_SAMPLES.",
@@ -343,28 +302,20 @@ module tb_scale_function #(
   endtask
 
   // --------------------------------------------------------------------
-  // Build dataset using a true Cartesian grid over the K2 top dims
+  // Build dataset using uniform random sampling over the K2 top dims
+  // Call $srandom(RAND_SEED) before invoking this task.
   // --------------------------------------------------------------------
   task automatic build_dataset();
-    real x[K2];
     real h[K1];
-    int idx[0:MAX_K-1];
-    int s;
 
     build_teacher();
 
-    for (int j = 0; j < MAX_K; j++) idx[j] = 0;
-
-    for (s = 0; s < NUM_SAMPLES; s++) begin
-      // Current grid point
+    for (int s = 0; s < NUM_SAMPLES; s++) begin
+      // Uniform random sample in [x_low[j], x_high[j]] for each dim
       for (int j = 0; j < K2; j++) begin
-        if (nx_lut[j] == 1) begin
-          x[j] = 0.5 * (x_low[j] + x_high[j]);
-        end else begin
-          x[j] = x_low[j]
-               + (x_high[j] - x_low[j]) * real'(idx[j]) / real'(nx_lut[j] - 1);
-        end
-        x_samples[s][j] = x[j];
+        real r;
+        r = real'({$urandom}) / 4294967295.0;
+        x_samples[s][j] = x_low[j] + (x_high[j] - x_low[j]) * r;
       end
 
       // h = ReLU(B_gt * x)
@@ -372,7 +323,7 @@ module tb_scale_function #(
         real acc;
         acc = 0.0;
         for (int j = 0; j < K2; j++) begin
-          acc += B_gt[i][j] * x[j];
+          acc += B_gt[i][j] * x_samples[s][j];
         end
         h[i] = relu_r(acc);
       end
@@ -385,16 +336,6 @@ module tb_scale_function #(
           acc += A_gt[o][i] * h[i];
         end
         y_targets[s][o] = acc;
-      end
-
-      // Mixed-radix increment
-      for (int j = 0; j < K2; j++) begin
-        idx[j]++;
-        if (idx[j] < nx_lut[j]) begin
-          break;
-        end else begin
-          idx[j] = 0;
-        end
       end
     end
   endtask
@@ -547,9 +488,9 @@ module tb_scale_function #(
     $display("[TB] EVAL_SETTLE_TICKS = %0d", EVAL_SETTLE_TICKS);
     $display("[TB] EPOCHS = %0d", EPOCHS);
     $display("[TB] CSV_PATH = %s", CSV_PATH);
+    $display("[TB] NUM_SAMPLES = %0d  RAND_SEED = %0d", NUM_SAMPLES, RAND_SEED);
     for (int j = 0; j < K2; j++) begin
-      $display("[TB] dim %0d : NX=%0d  range=[%0.4f,%0.4f]",
-               j, nx_lut[j], x_low[j], x_high[j]);
+      $display("[TB] dim %0d : range=[%0.4f,%0.4f]", j, x_low[j], x_high[j]);
     end
     $display("[TB] ==================================================");
   endtask
@@ -583,6 +524,7 @@ module tb_scale_function #(
     clear_clamps();
 
     load_runtime_config();
+    $srandom(RAND_SEED);
     build_dataset();
 
     wait(rst_n);
