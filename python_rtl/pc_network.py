@@ -112,8 +112,8 @@ class Neuron:
         back_vec = self.w[:self.n] * eps
         mi = self.alpha * eps
         if self.n > 0:
-            self.w[:self.n] = np.clip(self.w[:self.n] + mi * phi_xup, -self.wclip, self.wclip)
-        self.w[self.n] = np.clip(self.w[self.n] + mi * self.bls, -self.wclip, self.wclip)
+            self.w[:self.n] = self.w[:self.n] + mi * phi_xup
+        self.w[self.n] = self.w[self.n] + mi * self.bls
         self.x = x_obs if clamp else (self.x + self.gamma * (back_eff - eps))
         return eps, back_vec
 
@@ -199,12 +199,8 @@ class Layer:
         # S_WUP: W[i, :] += alpha * eps[i] * phi_xup
         mi = self.alpha * eps                            # shape (k,)
         if self.n > 0:
-            self.W = np.clip(
-                self.W + np.outer(mi, phi_xup),
-                -self.wclip, self.wclip)
-        self.bias = np.clip(
-            self.bias + mi * self.bls,
-            -self.wclip, self.wclip)
+            self.W = self.W + np.outer(mi, phi_xup)
+        self.bias = self.bias + mi * self.bls
 
         # S_STATE: clamped → x_obs; free → x + gamma*(back_eff - eps)
         new_x = self.x_state + self.gamma * (back_eff - eps)
