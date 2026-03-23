@@ -516,34 +516,12 @@ Predictive coding can approximate backpropagation-like error signals under conve
 \section{Experiments}
 \label{sec:experiments}
 
-The first two experiments (Sections~\ref{sec:exp-function}--\ref{sec:exp-tanh})
-are implemented as Verilator simulations using the reference RTL implementation.
+The first experiment (Section~\ref{sec:exp-tanh})
+is implemented as a Verilator simulation using the reference RTL implementation.
 The scaling experiment (Section~\ref{sec:exp-scaling}) and the remaining
 characterisation experiments use the \texttt{python\_rtl} floating-point
 reference implementation, whose agreement with RTL float32 arithmetic is
 formally bounded in Section~\ref{sec:exp-fidelity}.
-
-\subsection{Teacher--student regression}
-\label{sec:exp-function}
-
-A three-layer network (\(2 \rightarrow 4 \rightarrow 3\)) with a ReLU hidden
-layer is trained to match a fixed teacher \(y = A_{\mathrm{gt}}\,
-\mathrm{ReLU}(B_{\mathrm{gt}} x)\). Input and output layers are clamped;
-the hidden layer is free. MSE begins at \(0.341207\), spikes briefly to
-\(0.369199\) at epoch \(1\), then descends rapidly to \(0.004784\) by
-epoch \(7\) before settling to \(0.005935\) at epoch \(25\)
-(Figure~\ref{fig:relu_training}). The two-phase profile --- sharp initial
-descent followed by a slow plateau --- is consistent with the incremental
-tick regime, in which inference does not fully converge between weight updates.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\linewidth]{figures/relu_training_curve.png}
-\caption{Training curve for the \(2 \rightarrow 4 \rightarrow 3\) ReLU
-network. After a brief transient at epoch \(1\), MSE descends rapidly then
-settles into a slow-improvement plateau.}
-\label{fig:relu_training}
-\end{figure}
 
 \subsection{Nonlinear regression with hidden tanh layer}
 \label{sec:exp-tanh}
@@ -591,7 +569,8 @@ tiled across hidden units, and $A \in \mathbb{R}^{K_0 \times K_1}$ is a
 sparse readout tiled from a three-row motif.  The student network uses
 $f = \tanh$ in both the hidden and bottom layers, matching the teacher's
 function class exactly so that zero training error is achievable in principle.
-Biases are included as a fixed presynaptic lane in the hidden layer.
+Biases are included as a fixed presynaptic lane in the hidden layer and
+initialised from $\mathcal{N}(0,\,0.5^2)$.
 
 \paragraph{Curse of dimensionality and the role of sparse structure.}
 The choice of a structurally sparse teacher is not arbitrary: it is required
@@ -634,65 +613,23 @@ $\gamma=0.04$.
 
 \paragraph{Results.}
 All three architectures converge cleanly and monotonically
-(Figure~\ref{fig:scaling}). MSE drops more than two orders of magnitude within
-the first two epochs across all sizes: from $0.189$ to $0.0035$ for
-$2\rightarrow4\rightarrow3$, from $0.218$ to $0.0028$ for
-$4\rightarrow8\rightarrow4$, and from $0.282$ to $0.00052$ for
-$8\rightarrow16\rightarrow8$.  Final MSE at epoch 25 is $3.8\times10^{-4}$,
-$6.3\times10^{-4}$, and $2.2\times10^{-4}$ respectively, with no divergence
-or oscillation observed at any scale.  Notably, the largest configuration
-achieves the lowest absolute residual, consistent with increasing network
-capacity relative to a fixed-complexity sparse teacher.
+(Figure~\ref{fig:scaling}).  The random bias initialisation raises the initial
+MSE to $0.452$ for $2\rightarrow4\rightarrow3$, $0.380$ for
+$4\rightarrow8\rightarrow4$, and $0.477$ for $8\rightarrow16\rightarrow8$.
+Despite this elevated starting point, all three networks converge to small
+residuals by epoch~25: $5.0\times10^{-4}$, $5.2\times10^{-4}$, and
+$2.3\times10^{-4}$ respectively, with no divergence or oscillation at any
+scale.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.75\linewidth]{figures/tanh_scaling.png}
+\includegraphics[width=0.75\linewidth]{figures/python_runs_scaling.png}
 \caption{Training curves for three architectures of increasing dimension,
 trained on a Cartesian grid with a sparse tiled tanh teacher
-$y = A \cdot \tanh(B \cdot \tanh(x))$.  All three configurations converge
-cleanly without oscillation; the largest ($8 \rightarrow 16 \rightarrow 8$)
-achieves the lowest absolute residual, consistent with overcomplete
-hidden capacity relative to the sparse teacher.}
+$y = A \cdot \tanh(B \cdot \tanh(x))$ and bias weights initialised from
+$\mathcal{N}(0,\,0.5^2)$.  All three configurations converge cleanly
+without oscillation.}
 \label{fig:scaling}
-\end{figure}
-
-\subsection{Scaling with random bias initialisation}
-\label{sec:exp-scaling-bias}
-
-The previous scaling experiment initialised all bias weights to zero.  To test
-whether the local learning dynamics remain effective when biases carry an initial
-offset, the same three architectures are retrained under the same protocol
-(\(\alpha = 0.01\), decay \(0.95\), \(\gamma = 0.04\), 25~epochs, sparse tiled
-tanh teacher) with bias weights drawn from \(\mathcal{N}(0,\,0.5^2)\) at
-initialisation (\texttt{--bias-init-scale 0.5}).
-
-\paragraph{Results.}
-Random bias initialisation raises the initial MSE across all three
-configurations: from $0.189$ to $0.452$ for $2\rightarrow4\rightarrow3$,
-from $0.218$ to $0.380$ for $4\rightarrow8\rightarrow4$, and from $0.282$ to
-$0.477$ for $8\rightarrow16\rightarrow8$.  Despite this elevated starting
-point, all three networks converge to small residuals by epoch~25: $5.0\times
-10^{-4}$, $5.2\times10^{-4}$, and $2.3\times10^{-4}$ respectively
-(Figure~\ref{fig:scaling_bias}).  The two smaller configurations follow a
-convergence profile similar to the zero-bias case, with most of the MSE
-reduction occurring in the first two epochs.  The largest configuration
-($8\rightarrow16\rightarrow8$) takes more epochs to absorb the initial bias
-offset --- dropping below $10^{-3}$ around epoch~4 rather than epoch~2 ---
-but still converges cleanly and monotonically.  Final residuals are comparable
-to those obtained with zero initialisation, confirming that the local
-predictive-coding update rule can absorb non-zero bias initialisation without
-any manual tuning of the bias learning rate.
-
-\begin{figure}[H]
-\centering
-\includegraphics[width=0.75\linewidth]{figures/tanh_scaling_bias.png}
-\caption{Training curves for the same three architectures as
-Figure~\ref{fig:scaling}, with bias weights initialised from
-$\mathcal{N}(0,\,0.5^2)$.  All three configurations converge to comparable
-final residuals despite the elevated initial MSE caused by the random bias
-offsets; the largest architecture takes a few extra epochs to absorb the
-initial offset before descending steeply.}
-\label{fig:scaling_bias}
 \end{figure}
 
 \subsection{Stability and hyperparameter characterization}
@@ -840,31 +777,23 @@ ULP floor and remains flat throughout both phases.}
 \hline
 Experiment & Architecture & Initial MSE & Final MSE \\
 \hline
-Teacher--student (ReLU) & \(2 \rightarrow 4 \rightarrow 3\) & 0.341207 & 0.005935 \\
-Hidden tanh             & \(2 \rightarrow 2 \rightarrow 1\) & 1.106512 & 0.004382 \\
+Hidden tanh    & \(2 \rightarrow 2 \rightarrow 1\) & 1.106512 & 0.004382 \\
 \hline
-Scaling: small  & \(2 \rightarrow 4 \rightarrow 3\)  & 0.1886 & 0.000380 \\
-Scaling: medium & \(4 \rightarrow 8 \rightarrow 4\)  & 0.2179 & 0.000626 \\
-Scaling: large  & \(8 \rightarrow 16 \rightarrow 8\) & 0.2819 & 0.000224 \\
-\hline
-Scaling (bias init): small  & \(2 \rightarrow 4 \rightarrow 3\)  & 0.4519 & 0.000501 \\
-Scaling (bias init): medium & \(4 \rightarrow 8 \rightarrow 4\)  & 0.3804 & 0.000516 \\
-Scaling (bias init): large  & \(8 \rightarrow 16 \rightarrow 8\) & 0.4771 & 0.000231 \\
+Scaling: small  & \(2 \rightarrow 4 \rightarrow 3\)  & 0.4519 & 0.000501 \\
+Scaling: medium & \(4 \rightarrow 8 \rightarrow 4\)  & 0.3804 & 0.000516 \\
+Scaling: large  & \(8 \rightarrow 16 \rightarrow 8\) & 0.4771 & 0.000231 \\
 \hline
 \end{tabular}
-\caption{Final MSE values reported at epoch~25. The top two rows are the
-reference regression experiments (RTL simulation); the middle three are the
+\caption{Final MSE values reported at epoch~25. The top row is the
+reference regression experiment (RTL simulation); the bottom three are the
 architectural scaling sweep (Python reference, sparse tiled tanh teacher,
-zero bias init); the bottom three repeat the scaling sweep with bias weights
-initialised from $\mathcal{N}(0,\,0.5^2)$.  Final residuals are comparable
-across both bias-init conditions, confirming robustness of the local update
-rule to non-zero bias offsets.}
+bias weights initialised from $\mathcal{N}(0,\,0.5^2)$).}
 \label{tab:results-summary}
 \end{table}
 
-Across all five runs, end-to-end supervised learning proceeds using only local
+Across all four runs, end-to-end supervised learning proceeds using only local
 state variables, local prediction errors, and adjacent-layer communication
-under a fixed FSM schedule. Nonzero residual floors in the RTL experiments
+under a fixed FSM schedule. Nonzero residual floors in the RTL experiment
 motivate further study of tick budget and step-size tuning.
 
 \subsection{Evaluation protocol}
