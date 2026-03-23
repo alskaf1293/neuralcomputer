@@ -13,7 +13,7 @@ Training schedule per sample:
 
 Eval per sample: EVAL_SETTLE=250 ticks (alpha=0), read bottom neuron 0.
 
-Output: runs/pc3_tanh_reg.csv   columns: epoch,mse
+Output: python_runs/pc3_tanh_reg.csv   columns: epoch,mse
 """
 import numpy as np
 import csv
@@ -86,8 +86,8 @@ def main():
         gen_k_lut = [8, 16, 8],
     )
 
-    os.makedirs('runs', exist_ok=True)
-    csv_path = 'runs/pc3_tanh_reg.csv'
+    os.makedirs('python_runs', exist_ok=True)
+    csv_path = 'python_runs/pc3_tanh_reg.csv'
 
     print(f'[TB] Teacher: y = A_gt * tanh(B_gt * x + b1_gt) + b2_gt')
     print(f'[TB] A_gt = {A_gt},  b2_gt = {b2_gt}')

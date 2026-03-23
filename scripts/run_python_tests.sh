@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_python_tests.sh — reproduce all runs/ CSVs using Python RTL models.
+# run_python_tests.sh — reproduce all python_runs/ CSVs using Python RTL models.
 # Usage: ./scripts/run_python_tests.sh [--fast]
 #   --fast  uses reduced eval ticks for quick sanity check
 
@@ -33,4 +33,4 @@ echo "=== tb_scale_function: 8→16→8 (may diverge — matches RTL behaviour) 
 python3 python_rtl/tb_scale_function.py --configs 8_16_8 $EVAL
 
 echo ""
-echo "All Python testbench reproductions done. CSVs saved to runs/"
+echo "All Python testbench reproductions done. CSVs saved to python_runs/"

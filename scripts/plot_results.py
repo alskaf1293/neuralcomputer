@@ -1,3 +1,4 @@
+import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
@@ -54,10 +55,19 @@ def make_output_name(filename):
     return mapping.get(name, name)
 
 # -----------------------------
+# Args
+# -----------------------------
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--runs-dir", default="runs",
+                    help="Directory containing CSV results (default: runs)")
+args = parser.parse_args()
+
+# -----------------------------
 # Discover CSVs
 # -----------------------------
 
-runs_dir = "runs"
+runs_dir = args.runs_dir
 all_csvs = sorted(f for f in os.listdir(runs_dir) if f.endswith(".csv"))
 
 single_csvs = [f for f in all_csvs if not f.startswith("scale_")]
