@@ -3,9 +3,9 @@
 tb_scale_function.py — Python reproduction of tb/tb_scale_function.sv.
 
 Generic 3-layer PC scaling testbench; runs three configurations:
-  K2→K1→K0 = 2→4→3   → runs/scale_2_4_3.csv
-  K2→K1→K0 = 4→8→4   → runs/scale_4_8_4.csv
-  K2→K1→K0 = 8→16→8  → runs/scale_8_16_8.csv
+  K2→K1→K0 = 2→4→3   → python_runs/scale_2_4_3.csv
+  K2→K1→K0 = 4→8→4   → python_runs/scale_4_8_4.csv
+  K2→K1→K0 = 8→16→8  → python_runs/scale_8_16_8.csv
 
 Teacher variants (--teacher):
   tiled        — sparse ReLU motif:    y = A · ReLU(B · x)              (realizable by ReLU net)
@@ -521,7 +521,7 @@ def main():
             eff_n_samples = n_samples
             eff_alpha = args.alpha
 
-        csv_path = f'runs/{filename}'
+        csv_path = f'python_runs/{filename}'
         run_experiment(K0, K1, K2, csv_path,
                        alpha=eff_alpha,
                        gamma=args.gamma,
