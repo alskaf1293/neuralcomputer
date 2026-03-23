@@ -141,13 +141,14 @@ class Layer:
                  gamma: float = 0.1,
                  alpha: float = 0.05,
                  bias_lr_scale: float = 1.0,
-                 x_init: float = 0.0):
+                 x_init: float = 0.0,
+                 bias_init: Optional[np.ndarray] = None):
         self.k = k; self.n = n; self.m = m
         self.phi_fn = get_phi(phi)
         self.wclip = wclip; self.gamma = gamma; self.alpha = alpha; self.bls = bias_lr_scale
 
         self.W    = np.asarray(winit_matrix, dtype=np.float64)   # (k, n)
-        self.bias = np.zeros(k, dtype=np.float64)
+        self.bias = np.zeros(k, dtype=np.float64) if bias_init is None else np.asarray(bias_init, dtype=np.float64)
         self.x_state = np.full(k, x_init, dtype=np.float64)
         self.eps     = np.zeros(k, dtype=np.float64)
         self.back_kn = np.zeros((k, n), dtype=np.float64)
@@ -252,7 +253,8 @@ class PCNet3Layer:
                  bias_lr_scale: float = 1.0,
                  seed: Optional[int] = None,
                  rtl_init: bool = True,
-                 gen_k_lut: Optional[list[int]] = None):
+                 gen_k_lut: Optional[list[int]] = None,
+                 bias_init_scale: float = 0.0):
         """
         Parameters
         ----------
@@ -292,12 +294,22 @@ class PCNet3Layer:
         import struct as _struct
         x_init = float(_struct.unpack('>f', _struct.pack('>I', 0x3A83126F))[0])
 
+        def binit(k: int) -> Optional[np.ndarray]:
+            if bias_init_scale == 0.0:
+                return None
+            raw = rng.standard_normal(k)
+            if rtl_init:
+                return (raw.astype(np.float32) * np.float32(bias_init_scale)).astype(np.float64)
+            return raw * bias_init_scale
+
         # layer 0: bottom (k0 neurons, n=k1 presynaptic from layer 1, m=0)
         self.layer0 = Layer(k0, k1, 0,  rinit(0),  act_lut[0],
-                            wclip, gamma, alpha, bias_lr_scale, x_init=float(x_init))
+                            wclip, gamma, alpha, bias_lr_scale, x_init=float(x_init),
+                            bias_init=binit(k0))
         # layer 1: hidden (k1 neurons, n=k2 presynaptic from layer 2, m=k0 back from layer 0)
         self.layer1 = Layer(k1, k2, k0, rinit(1),  act_lut[1],
-                            wclip, gamma, alpha, bias_lr_scale, x_init=float(x_init))
+                            wclip, gamma, alpha, bias_lr_scale, x_init=float(x_init),
+                            bias_init=binit(k1))
         # layer 2: top (k2 neurons, n=0 no presynaptic above, m=k1 back from layer 1)
         self.layer2 = Layer(k2, 0,  k1, np.zeros((k2, 0)), act_lut[2],
                             wclip, gamma, alpha, bias_lr_scale, x_init=float(x_init))
