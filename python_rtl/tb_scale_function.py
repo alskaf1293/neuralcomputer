@@ -6,21 +6,19 @@ Generic 3-layer PC scaling testbench; runs three configurations:
   K2→K1→K0 = 2→4→3   → runs/scale_2_4_3.csv
   K2→K1→K0 = 4→8→4   → runs/scale_4_8_4.csv
   K2→K1→K0 = 8→16→8  → runs/scale_8_16_8.csv
-  K2→K1→K0 = 16→32→16 → runs/scale_16_32_16.csv
 
-All use ACT_LUT = [linear, relu, linear].
+Teacher variants (--teacher):
+  tiled        — sparse ReLU motif:    y = A · ReLU(B · x)              (realizable by ReLU net)
+  tiled_tanh   — sparse tanh motif:    y = A · tanh(B · tanh(x))        (realizable by tanh net, same sparse structure as tiled)
+  shallow_tanh — single-hidden-layer:  y = W2 · tanh(W1 · tanh(x) + b) (realizable by tanh net, dense random)
+  deep_tanh    — two-hidden-layer MLP: y = W3 · tanh(W2 · tanh(W1·x+b1)+b2)  (unrealizable)
 
-Teacher (default 'deep_tanh') — two-hidden-layer random MLP:
-  h1 = tanh(W1 · x + b1)
-  h2 = tanh(W2 · h1 + b2)
-  y  = W3 · h2
-  with Xavier-scaled random weights — a richer, non-structured function class.
+Teacher-specific defaults (applied when flag is omitted):
+  tiled:                  alpha=0.01,  gamma=0.04, lr_decay=0.95, act_hidden=relu, eval_settle=300
+  tiled_tanh:             alpha=0.01,  gamma=0.04, lr_decay=0.95, act_hidden=tanh, eval_settle=300
+  shallow_tanh/deep_tanh: alpha=0.003, gamma=0.04, lr_decay=1.0,  act_hidden=tanh, eval_settle=1000
 
-Legacy tiled teacher ('tiled') still available for backward compatibility.
-
-Training schedule (all configs):
-  ALPHA=0.05, GAMMA=0.10
-  INFER_TICKS=200, LEARN_TICKS=20, EVAL_SETTLE=2000, EPOCHS=25
+Use --width-mult N to scale K1 by N for more hidden capacity (useful with deep_tanh).
 """
 import numpy as np
 import csv
@@ -67,6 +65,59 @@ def build_teacher(K0: int, K1: int, K2: int):
                 A[o, base + k] = val
 
     return A, B
+
+
+# ── tiled tanh teacher: same sparse motif as tiled ReLU but with tanh ────────
+
+def build_tiled_tanh_teacher(K0: int, K1: int, K2: int):
+    """
+    Sparse tiled teacher with tanh: y = A · tanh(B · tanh(x)).
+
+    Uses the same sparse B (1–2 nonzero entries per row) and A matrices as the
+    tiled ReLU teacher, but replaces ReLU with tanh.  Also applies tanh(x)
+    element-wise as input features, matching the student's function class when
+    act_bottom = act_hidden = 'tanh'.
+
+    This is the tanh analogue of the tiled ReLU teacher: same low effective
+    dimensionality (each hidden unit depends on 1–2 input dimensions), same
+    sample requirements, same convergence profile — the only difference is the
+    nonlinearity.
+    """
+    A, B = build_teacher(K0, K1, K2)
+
+    def teacher_fn(x: np.ndarray) -> np.ndarray:
+        return A @ np.tanh(B @ np.tanh(x))
+
+    return teacher_fn
+
+
+# ── shallow teacher: single-hidden-layer random MLP with tanh ─────────────────
+
+def build_shallow_teacher(K0: int, K1: int, K2: int, seed: int = 7):
+    """
+    Single-hidden-layer random teacher: y = W2 · tanh(W1 · tanh(x) + b1).
+
+    Uses tanh(x) (element-wise) as input features, matching the student's
+    hidden-layer prediction mu_h = W1 @ tanh(x_input) + bias1.  This makes
+    the problem realizable: the student spans exactly the same function class
+    as the teacher and can in principle achieve zero error.
+
+    Note: using raw x as features (W1 @ x + b) would require the student to
+    represent linear combinations of x, but the student's prior uses
+    tanh(x) as features — an incompatible function class that causes a
+    permanent plateau regardless of training length.
+
+    Returns a callable teacher_fn(x: ndarray shape (K2,)) -> ndarray shape (K0,).
+    """
+    rng = np.random.default_rng(seed)
+    W1 = rng.standard_normal((K1, K2)) * np.sqrt(2.0 / K2)
+    b1 = rng.standard_normal(K1)       * 0.5
+    W2 = rng.standard_normal((K0, K1)) * np.sqrt(2.0 / K1)
+
+    def teacher_fn(x: np.ndarray) -> np.ndarray:
+        return W2 @ np.tanh(W1 @ np.tanh(x) + b1)
+
+    return teacher_fn
 
 
 # ── rich teacher: two-hidden-layer random MLP with tanh ───────────────────────
@@ -225,13 +276,19 @@ def run_experiment(K0: int, K1: int, K2: int, csv_path: str,
                    n_samples: int = None,
                    act_hidden: str = 'relu',
                    bias_lr_scale: float = 1.0,
+                   bias_init_scale: float = 0.0,
                    teacher_kind: str = 'tiled',
                    teacher_seed: int = 7) -> None:
 
     rng = np.random.default_rng(seed)
 
-    if teacher_kind == 'deep_tanh':
-        teacher_fn = build_deep_teacher(K0, K1, K2, seed=teacher_seed)
+    if teacher_kind in ('deep_tanh', 'shallow_tanh', 'tiled_tanh'):
+        if teacher_kind == 'deep_tanh':
+            teacher_fn = build_deep_teacher(K0, K1, K2, seed=teacher_seed)
+        elif teacher_kind == 'shallow_tanh':
+            teacher_fn = build_shallow_teacher(K0, K1, K2, seed=teacher_seed)
+        else:  # tiled_tanh
+            teacher_fn = build_tiled_tanh_teacher(K0, K1, K2)
         if n_samples is not None:
             x_samples, y_targets, num_samples = build_random_dataset_fn(
                 K0, K1, K2, teacher_fn, n_samples, rng)
@@ -259,26 +316,52 @@ def run_experiment(K0: int, K1: int, K2: int, csv_path: str,
     print(f'[TB] CSV_PATH = {csv_path}')
     for j in range(K2):
         print(f'[TB] dim {j}: range=[{x_low[j]:.4f},{x_high[j]:.4f}]')
-    print(f'[TB] ACT_HIDDEN={act_hidden}  BIAS_LR_SCALE={bias_lr_scale}  TEACHER={teacher_kind}')
+    # For tanh/sigmoid hidden layers, the bottom layer must share the same
+    # activation so that phi'(x_h) in the back signal matches the derivative of
+    # how layer 0 uses x_h.  With a linear bottom, layer 0 computes W0 @ x_h
+    # (derivative = 1) but the hidden layer applies tanh'(x_h) < 1, causing a
+    # systematic gradient attenuation that stalls inference.  Matching activations
+    # also makes the problem representable: student output W0 @ tanh(x_h) can
+    # exactly match teacher y = W2 @ tanh(W1 @ x + b).
+    act_bottom = act_hidden if act_hidden in ('tanh', 'sigmoid') else 'linear'
+    print(f'[TB] ACT_BOTTOM={act_bottom}  ACT_HIDDEN={act_hidden}  BIAS_LR_SCALE={bias_lr_scale}  BIAS_INIT_SCALE={bias_init_scale}  TEACHER={teacher_kind}')
     print(f'[TB] {"=" * 50}')
 
     gen_k_lut = [max(8, K0), max(16, K1), max(8, K2)]
     net = PCNet3Layer(
-        k_lut         = [K0, K1, K2],
-        act_lut       = ['linear', act_hidden, 'linear'],
-        wclip         = 20.0,
-        gamma         = gamma,
-        alpha         = alpha,
-        seed          = seed,
-        rtl_init      = True,
-        gen_k_lut     = gen_k_lut,
-        bias_lr_scale = bias_lr_scale,
+        k_lut           = [K0, K1, K2],
+        act_lut         = [act_bottom, act_hidden, 'linear'],
+        wclip           = 20.0,
+        gamma           = gamma,
+        alpha           = alpha,
+        seed            = seed,
+        rtl_init        = True,
+        gen_k_lut       = gen_k_lut,
+        bias_lr_scale   = bias_lr_scale,
+        bias_init_scale = bias_init_scale,
     )
+
+    # RTL init value (32'h3A83126F) — reused to reset states per sample
+    x_init = net.layer1.x_state[0]
+
+    def reset_hidden():
+        """Reset free-layer states before each sample's inference.
+
+        Without this, hidden states carry over from the previous sample.
+        For tanh networks, large carry-over values saturate neurons
+        (tanh'(x) → 0), killing the back gradient and preventing settling
+        in a fixed number of inference ticks — regardless of how many ticks
+        are used.  Resetting to x_init ensures inference always starts from
+        a non-saturated, neutral point.
+        """
+        net.layer1.x_state[:] = x_init
+        net.layer0.x_state[:] = x_init
 
     def mse_dataset():
         net.set_rates(alpha=0.0, gamma=gamma)
         acc = 0.0
         for s in range(num_samples):
+            reset_hidden()
             for _ in range(eval_settle):
                 net.tick(x_samples[s], y_bottom=None,
                          clamp_top=True, clamp_bottom=False)
@@ -299,6 +382,7 @@ def run_experiment(K0: int, K1: int, K2: int, csv_path: str,
         for ep in range(epochs):
             alpha_ep = alpha * (lr_decay ** ep)
             for s in range(num_samples):
+                reset_hidden()
                 # Phase 1: infer to convergence — states free, no weight updates
                 net.set_rates(alpha=0.0, gamma=gamma)
                 for _ in range(infer_ticks):
@@ -313,73 +397,133 @@ def run_experiment(K0: int, K1: int, K2: int, csv_path: str,
 
             msep = mse_dataset()
             writer.writerow([ep + 1, f'{msep:.6f}'])
-            print(f'[TB] Epoch {ep + 1}  alpha={alpha_ep:.5f}  MSE = {msep:.6f}')
+
+            # Hidden-layer saturation diagnostic (tanh phi' < 0.1 when |x| > ~1.8)
+            h = net.layer1.x_state
+            sat_pct = float(np.mean(np.abs(h) > 1.8) * 100)
+            h_mean  = float(np.mean(np.abs(h)))
+            print(f'[TB] Epoch {ep + 1}  alpha={alpha_ep:.5f}  MSE={msep:.6f}'
+                  f'  hidden |x|_mean={h_mean:.3f}  sat%={sat_pct:.0f}%')
 
     print(f'Saved: {csv_path}\n')
 
 
 def main():
     p = argparse.ArgumentParser(description='tb_scale_function Python reproduction')
-    p.add_argument('--configs', nargs='+', default=['2_4_3', '4_8_4', '8_16_8', '16_32_16'],
-                   help='Configs to run, e.g. 2_4_3 4_8_4 8_16_8 16_32_16')
-    p.add_argument('--alpha',       type=float, default=0.01)   # matches test_all.sh
-    p.add_argument('--gamma',       type=float, default=0.04)   # matches test_all.sh
+    p.add_argument('--configs', nargs='+', default=['2_4_3', '4_8_4', '8_16_8'],
+                   help='Configs to run, e.g. 2_4_3 4_8_4 8_16_8')
+    p.add_argument('--alpha',       type=float, default=None,
+                   help='Weight learning rate (default: 0.01 for tiled, 0.003 for deep_tanh)')
+    p.add_argument('--gamma',       type=float, default=None,
+                   help='State inference rate (default: 0.04)')
     p.add_argument('--infer-ticks', type=int,   default=200)
     p.add_argument('--learn-ticks', type=int,   default=20)
-    p.add_argument('--eval-settle', type=int,   default=300)    # matches test_all.sh
+    p.add_argument('--eval-settle', type=int,   default=None,
+                   help='Settling ticks during evaluation (default: 300 for tiled, 1000 for deep_tanh)')
     p.add_argument('--epochs',      type=int,   default=25)
     p.add_argument('--seed',        type=int,   default=0)
-    p.add_argument('--lr-decay',    type=float, default=0.95,
-                   help='Multiplicative alpha decay per epoch (1.0 = no decay)')
-    p.add_argument('--n-samples',   type=int,   default=256,
-                   help='Use random sampling with N samples instead of Cartesian grid')
+    p.add_argument('--lr-decay',    type=float, default=None,
+                   help='Multiplicative alpha decay per epoch (default: 0.95 for tiled, 0.90 for deep_tanh)')
+    p.add_argument('--n-samples',   type=int,   default=None,
+                   help='Random samples per epoch (default: 32×K1 for tanh teachers, '
+                        '256 for tiled; overrides auto-scaling when set explicitly)')
     p.add_argument('--sample-sweep', type=str,  default=None,
                    help='Comma-separated list of sample counts to sweep over, e.g. 256,1024,4096. '
                         'Runs each config × each N; outputs scale_{cfg}_n{N}.csv')
-    p.add_argument('--act-hidden', type=str, default='relu',
+    p.add_argument('--act-hidden', type=str, default=None,
                    choices=['relu', 'tanh', 'sigmoid', 'linear'],
-                   help='Activation function for the hidden layer (default: relu)')
+                   help='Activation function for the hidden layer '
+                        '(default: relu for tiled teacher, tanh for deep_tanh teacher)')
     p.add_argument('--bias-lr-scale', type=float, default=1.0,
                    help='Bias learning rate multiplier (0.0 = frozen bias, default: 1.0)')
+    p.add_argument('--bias-init-scale', type=float, default=0.0,
+                   help='Std-dev of N(0, s) bias initialisation (0.0 = zero init, default: 0.0)')
     p.add_argument('--act-sweep', action='store_true',
                    help='If set, sweep over all hidden activations (relu, tanh, sigmoid) '
                         'for each config/size combination')
     p.add_argument('--teacher', type=str, default='tiled',
-                   choices=['deep_tanh', 'tiled'],
-                   help='Teacher function class: deep_tanh (default) = two-hidden-layer '
-                        'random MLP with tanh; tiled = legacy sparse motif')
+                   choices=['deep_tanh', 'shallow_tanh', 'tiled', 'tiled_tanh'],
+                   help='Teacher function class: tiled = sparse ReLU motif (default); '
+                        'tiled_tanh = sparse tanh motif, same structure as tiled but with tanh; '
+                        'shallow_tanh = single-hidden-layer tanh MLP (realizable by student); '
+                        'deep_tanh = two-hidden-layer tanh MLP (unrealizable, harder)')
     p.add_argument('--teacher-seed', type=int, default=7,
                    help='RNG seed for deep_tanh teacher weights (default: 7)')
+    p.add_argument('--width-mult', type=int, default=1,
+                   help='Multiply K1 (hidden width) by this factor for more capacity (default: 1)')
     args = p.parse_args()
+
+    # Resolve teacher-specific defaults for any flag left unset
+    if args.teacher in ('deep_tanh', 'shallow_tanh'):
+        if args.alpha       is None: args.alpha       = 0.003
+        if args.gamma       is None: args.gamma       = 0.04
+        if args.lr_decay    is None: args.lr_decay    = 1.0
+        if args.act_hidden  is None: args.act_hidden  = 'tanh'
+        if args.eval_settle is None: args.eval_settle = 1000
+    elif args.teacher == 'tiled_tanh':
+        if args.alpha       is None: args.alpha       = 0.01
+        if args.gamma       is None: args.gamma       = 0.04
+        if args.lr_decay    is None: args.lr_decay    = 0.95
+        if args.act_hidden  is None: args.act_hidden  = 'tanh'
+        if args.eval_settle is None: args.eval_settle = 300
+    else:  # tiled
+        if args.alpha       is None: args.alpha       = 0.01
+        if args.gamma       is None: args.gamma       = 0.04
+        if args.lr_decay    is None: args.lr_decay    = 0.95
+        if args.act_hidden  is None: args.act_hidden  = 'relu'
+        if args.eval_settle is None: args.eval_settle = 300
 
     # Determine activation variants to sweep
     act_variants = ['relu', 'tanh', 'sigmoid'] if args.act_sweep else [args.act_hidden]
 
-    # Build list of (cfg, n_samples, act_hidden, bias_lr_scale, csv_filename) runs
+    # Filename tags that distinguish runs from different settings
+    teacher_tag = {'deep_tanh': '_dt', 'shallow_tanh': '_st', 'tiled_tanh': '_tt', 'tiled': ''}.get(args.teacher, '')
+    width_tag   = f'_w{args.width_mult}' if args.width_mult != 1 else ''
+
+    # Build list of (cfg, n_samples, act_hidden, bias_lr_scale, bias_init_scale, csv_filename) runs
     runs = []
     if args.sample_sweep is not None:
         sweep_ns = [int(x) for x in args.sample_sweep.split(',')]
         for cfg in args.configs:
             for n in sweep_ns:
                 for act in act_variants:
-                    act_tag = f'_{act}' if act != 'relu' else ''
-                    blr_tag = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
-                    runs.append((cfg, n, act, args.bias_lr_scale,
-                                 f'scale_{cfg}_n{n}{act_tag}{blr_tag}.csv'))
+                    act_tag  = f'_{act}' if act != 'relu' else ''
+                    blr_tag  = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
+                    bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.0 else ''
+                    runs.append((cfg, n, act, args.bias_lr_scale, args.bias_init_scale,
+                                 f'scale_{cfg}_n{n}{act_tag}{blr_tag}{bis_tag}{teacher_tag}{width_tag}.csv'))
     else:
         for cfg in args.configs:
             for act in act_variants:
-                act_tag = f'_{act}' if act != 'relu' else ''
-                blr_tag = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
-                runs.append((cfg, args.n_samples, act, args.bias_lr_scale,
-                             f'scale_{cfg}{act_tag}{blr_tag}.csv'))
+                act_tag  = f'_{act}' if act != 'relu' else ''
+                blr_tag  = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
+                bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.0 else ''
+                runs.append((cfg, args.n_samples, act, args.bias_lr_scale, args.bias_init_scale,
+                             f'scale_{cfg}{act_tag}{blr_tag}{bis_tag}{teacher_tag}{width_tag}.csv'))
 
-    for cfg, n_samples, act_hidden, bias_lr_scale, filename in runs:
+    for cfg, n_samples, act_hidden, bias_lr_scale, bias_init_scale, filename in runs:
         parts = cfg.split('_')
-        K2, K1, K0 = int(parts[0]), int(parts[1]), int(parts[2])
-        csv_path = f'python_runs/{filename}'
+        K2, K1, K0 = int(parts[0]), int(parts[1]) * args.width_mult, int(parts[2])
+
+        # For dense tanh teachers, scale n_samples with K1×K2 (the dominant weight
+        # matrix size) to maintain constant sample-to-parameter ratio.  Compensate
+        # by scaling alpha down proportionally so the epoch-level weight update
+        # magnitude stays constant regardless of config size.
+        # n_ref = smallest config's sample count (K1=4, K2=2 → 64), used as anchor.
+        n_ref = 8 * 4 * 2  # = 64
+        if args.n_samples is not None:
+            eff_n_samples = n_samples
+            eff_alpha = args.alpha
+        elif args.teacher in ('shallow_tanh', 'deep_tanh'):
+            eff_n_samples = 8 * K1 * K2
+            eff_alpha = args.alpha * n_ref / eff_n_samples  # keep epoch-level LR constant
+        else:  # tiled, tiled_tanh: use grid (n_samples=None triggers grid builder)
+            eff_n_samples = n_samples
+            eff_alpha = args.alpha
+
+        csv_path = f'runs/{filename}'
         run_experiment(K0, K1, K2, csv_path,
-                       alpha=args.alpha,
+                       alpha=eff_alpha,
                        gamma=args.gamma,
                        infer_ticks=args.infer_ticks,
                        learn_ticks=args.learn_ticks,
@@ -387,9 +531,10 @@ def main():
                        epochs=args.epochs,
                        seed=args.seed,
                        lr_decay=args.lr_decay,
-                       n_samples=n_samples,
+                       n_samples=eff_n_samples,
                        act_hidden=act_hidden,
                        bias_lr_scale=bias_lr_scale,
+                       bias_init_scale=bias_init_scale,
                        teacher_kind=args.teacher,
                        teacher_seed=args.teacher_seed)
 
