@@ -436,15 +436,15 @@ def main():
                         '(default: relu for tiled teacher, tanh for deep_tanh teacher)')
     p.add_argument('--bias-lr-scale', type=float, default=1.0,
                    help='Bias learning rate multiplier (0.0 = frozen bias, default: 1.0)')
-    p.add_argument('--bias-init-scale', type=float, default=0.0,
-                   help='Std-dev of N(0, s) bias initialisation (0.0 = zero init, default: 0.0)')
+    p.add_argument('--bias-init-scale', type=float, default=0.5,
+                   help='Std-dev of N(0, s) bias initialisation (default: 0.5)')
     p.add_argument('--act-sweep', action='store_true',
                    help='If set, sweep over all hidden activations (relu, tanh, sigmoid) '
                         'for each config/size combination')
-    p.add_argument('--teacher', type=str, default='tiled',
+    p.add_argument('--teacher', type=str, default='tiled_tanh',
                    choices=['deep_tanh', 'shallow_tanh', 'tiled', 'tiled_tanh'],
-                   help='Teacher function class: tiled = sparse ReLU motif (default); '
-                        'tiled_tanh = sparse tanh motif, same structure as tiled but with tanh; '
+                   help='Teacher function class: tiled_tanh = sparse tanh motif (default); '
+                        'tiled = sparse ReLU motif; '
                         'shallow_tanh = single-hidden-layer tanh MLP (realizable by student); '
                         'deep_tanh = two-hidden-layer tanh MLP (unrealizable, harder)')
     p.add_argument('--teacher-seed', type=int, default=7,
@@ -476,8 +476,9 @@ def main():
     # Determine activation variants to sweep
     act_variants = ['relu', 'tanh', 'sigmoid'] if args.act_sweep else [args.act_hidden]
 
-    # Filename tags that distinguish runs from different settings
-    teacher_tag = {'deep_tanh': '_dt', 'shallow_tanh': '_st', 'tiled_tanh': '_tt', 'tiled': ''}.get(args.teacher, '')
+    # Filename tags that distinguish runs from different settings.
+    # tiled_tanh is the default teacher → no tag; tiled (ReLU) is now non-default → tag it.
+    teacher_tag = {'deep_tanh': '_dt', 'shallow_tanh': '_st', 'tiled_tanh': '', 'tiled': '_tiled'}.get(args.teacher, '')
     width_tag   = f'_w{args.width_mult}' if args.width_mult != 1 else ''
 
     # Build list of (cfg, n_samples, act_hidden, bias_lr_scale, bias_init_scale, csv_filename) runs
@@ -487,17 +488,17 @@ def main():
         for cfg in args.configs:
             for n in sweep_ns:
                 for act in act_variants:
-                    act_tag  = f'_{act}' if act != 'relu' else ''
+                    act_tag  = f'_{act}' if act != 'tanh' else ''   # tanh is default
                     blr_tag  = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
-                    bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.0 else ''
+                    bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.5 else ''
                     runs.append((cfg, n, act, args.bias_lr_scale, args.bias_init_scale,
                                  f'scale_{cfg}_n{n}{act_tag}{blr_tag}{bis_tag}{teacher_tag}{width_tag}.csv'))
     else:
         for cfg in args.configs:
             for act in act_variants:
-                act_tag  = f'_{act}' if act != 'relu' else ''
+                act_tag  = f'_{act}' if act != 'tanh' else ''   # tanh is default
                 blr_tag  = f'_blr{args.bias_lr_scale}' if args.bias_lr_scale != 1.0 else ''
-                bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.0 else ''
+                bis_tag  = f'_bis{args.bias_init_scale}' if args.bias_init_scale != 0.5 else ''
                 runs.append((cfg, args.n_samples, act, args.bias_lr_scale, args.bias_init_scale,
                              f'scale_{cfg}{act_tag}{blr_tag}{bis_tag}{teacher_tag}{width_tag}.csv'))
 
