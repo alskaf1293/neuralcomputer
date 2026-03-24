@@ -108,21 +108,12 @@ module neuron_core_single_back #(
     // Back contributions from layer l-1 (length M), will be summed
     input  logic [31:0]              back_in_ieee [M],
 
-    // Observability
-    output logic [$clog2(N_SAFE)-1:0] col_idx_o,   // indexes only the first N lanes (no bias)
-    output logic [31:0]               eps_ieee,
+    // State output
     output logic [31:0]               x_i_ieee,
 
     // Back output (vector, not streamed): θ .* ε_i for all true presynaptic j in [0..N-1]
     output logic                      back_vec_valid_o,
-    output logic [31:0]               back_vec_ieee [N],
-
-    // θ debug dump stream (exports only the first N θ; bias not streamed)
-    input  logic                      dbg_dump_start,
-    output logic                      dbg_busy,
-    output logic                      dbg_valid,
-    output logic [$clog2(N_SAFE)-1:0] dbg_idx,
-    output logic [31:0]               dbg_theta_ieee
+    output logic [31:0]               back_vec_ieee [N]
 );
     // ----------------- widths and constants -----------------
     localparam int   RECW   = EXP + SIG + 1;
@@ -136,11 +127,8 @@ module neuron_core_single_back #(
     hf_f2rec32 U_REC_BLR  (.in_ieee(BIAS_LR_SCALE_IEEE),      .out_rec(rec_bias_lr));
 
     // ------------- indices and small regs -------------------
-    logic [$clog2(N_SAFE)-1:0] col_j;               // external observability (0..N-1)
-    logic [$clog2(N_EFF)-1:0]  j, dbg_j_int;        // internal counters include bias lane
+    logic [$clog2(N_EFF)-1:0]  j;                   // internal counter (includes bias lane)
     logic [$clog2(M_SAFE)-1:0] r;
-
-    assign col_idx_o = col_j;
 
     // ------------- IEEE->recFN params -----------------------
     logic [RECW-1:0] alpha, gamma, x_obs;
@@ -314,12 +302,8 @@ module neuron_core_single_back #(
       end
     endgenerate
 
-    // --------- observability outputs ----------
-    hf_rec2f32 U_EPS (.in_rec(eps_i),   .out_ieee(eps_ieee));
+    // --------- state output ----------
     hf_rec2f32 U_XO  (.in_rec(x_i_eff), .out_ieee(x_i_ieee));
-
-    // Export only true θ’s (0..N-1) on the debug stream
-    hf_rec2f32 U_DBG (.in_rec(theta[(dbg_j_int < N) ? dbg_j_int : 0]), .out_ieee(dbg_theta_ieee));
 
     // -------------------- FSM --------------------
     typedef enum logic [2:0] {
@@ -348,7 +332,6 @@ module neuron_core_single_back #(
         st               <= S_IDLE;
         j                <= '0;
         r                <= '0;
-        col_j            <= '0;
         busy_o           <= 1'b0;
         done_o           <= 1'b0;
         back_vec_valid_o <= 1'b0;
@@ -379,7 +362,6 @@ module neuron_core_single_back #(
               back_sum <= rec_zero;
               j        <= '0;
               r        <= '0;
-              col_j    <= '0;
               // snapshot presynaptic column once at start
               for (int k=0; k<N; k++) x_col_ieee[k] <= x_vec_ieee[k];
               st       <= S_PRED;
@@ -393,7 +375,6 @@ module neuron_core_single_back #(
               st <= S_ERR;
             end else begin
               j <= j + 1;
-              if (j < N-1) col_j <= j + 1; // expose only true-lane index
             end
           end
 
@@ -457,37 +438,6 @@ module neuron_core_single_back #(
       end
     end
 
-    // ---------------- θ debug dump FSM (independent) ----------------
-    // Note: streams only θ[0..N-1] (excludes bias index N)
-    logic dbg_active;
-    always_ff @(posedge clk or negedge rst_n) begin
-      if (!rst_n) begin
-        dbg_active <= 1'b0;
-        dbg_busy   <= 1'b0;
-        dbg_valid  <= 1'b0;
-        dbg_j_int  <= '0;
-        dbg_idx    <= '0;
-      end else begin
-        dbg_valid <= 1'b0;
-        if (!busy_o && dbg_dump_start && !dbg_active) begin
-          dbg_active <= 1'b1;
-          dbg_busy   <= 1'b0; // goes high with first valid
-          dbg_j_int  <= '0;
-          dbg_idx    <= '0;
-        end else if (dbg_active) begin
-          dbg_valid <= 1'b1;
-          dbg_busy  <= 1'b1;
-          dbg_idx   <= dbg_j_int[$bits(dbg_idx)-1:0];
-          if (dbg_j_int == (N-1)) begin
-            dbg_active <= 1'b0;
-            dbg_busy   <= 1'b0;
-          end else begin
-            dbg_j_int <= dbg_j_int + 1'b1;
-          end
-        end
-      end
-    end
-
 endmodule
 
 `default_nettype wire
@@ -545,8 +495,6 @@ module pc_layer #(
   // ---- Internal fanouts and collectors ----
   logic [K-1:0] busy_vec, done_vec, back_valid_vec;
 
-  // Optional per-neuron observability (not exported)
-  logic [31:0] eps_i_ieee [K];
   logic [31:0] x_i_ieee   [K];
 
   // ---------- Edge detect for this layer ----------
@@ -631,14 +579,9 @@ module pc_layer #(
 
         .theta_preset_ieee(theta_row_ieee),
 
-        .col_idx_o(),
-        .eps_ieee(eps_i_ieee[gi]),
         .x_i_ieee(x_i_ieee[gi]),
         .back_vec_valid_o(back_valid_vec[gi]),
-        .back_vec_ieee(back_vec_ieee_i),
-
-        .dbg_dump_start(1'b0),
-        .dbg_busy(), .dbg_valid(), .dbg_idx(), .dbg_theta_ieee()
+        .back_vec_ieee(back_vec_ieee_i)
       );
 
       // Row gi of KxN back matrix
