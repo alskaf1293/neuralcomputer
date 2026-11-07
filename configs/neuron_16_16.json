@@ -1,0 +1,46 @@
+{
+  "DESIGN_NAME": "neuron_core",
+  "PDK": "sky130A",
+  "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 100,
+  "USE_SYNLIG": true,
+
+  "SYNTH_PARAMETERS": [
+    "J=16",
+    "K=16",
+    "SERIAL_MAX_J=16",
+    "EXP=8",
+    "SIG=24",
+    "ACT_KIND=1",
+    "CLAMP_HARD=1",
+    "X_I_INIT_IEEE=981668463",
+    "BIAS_INIT_IEEE=0",
+    "BIAS_LR_SCALE_IEEE=1065353216",
+    "FREEZE_BIAS=0"
+  ],
+
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::.",
+    "dir::HardFloat/source",
+    "dir::HardFloat/source/8086-SSE"
+  ],
+
+  "VERILOG_FILES": [
+    "dir::HardFloat/source/HardFloat_primitives.v",
+    "dir::HardFloat/source/HardFloat_rawFN.v",
+    "dir::HardFloat/source/addRecFN.v",
+    "dir::HardFloat/source/compareRecFN.v",
+    "dir::HardFloat/source/fNToRecFN.v",
+    "dir::HardFloat/source/iNToRecFN.v",
+    "dir::HardFloat/source/isSigNaNRecFN.v",
+    "dir::HardFloat/source/mulAddRecFN.v",
+    "dir::HardFloat/source/mulRecFN.v",
+    "dir::HardFloat/source/recFNToFN.v",
+    "dir::HardFloat/source/recFNToIN.v",
+    "dir::HardFloat/source/recFNToRecFN.v",
+    "dir::HardFloat/source/8086-SSE/HardFloat_specialize.v",
+    "dir::rtl/nc_neuralcomputer.sv"
+  ]
+}

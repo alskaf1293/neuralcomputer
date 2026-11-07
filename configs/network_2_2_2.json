@@ -1,0 +1,120 @@
+{
+  "DESIGN_NAME": "pc_network_222",
+  "PDK": "sky130A",
+  "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 150,
+  "USE_SLANG": true,
+  "DRT_ANTENNA_REPAIR_ITERS": 10,
+  "PL_RESIZER_HOLD_SLACK_MARGIN": 0.2,
+  "GRT_RESIZER_HOLD_SLACK_MARGIN": 0.2,
+
+  "VERILOG_DEFINES": [
+    "USE_HARDENED_NEURON"
+  ],
+
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::."
+  ],
+
+  "VERILOG_FILES": [
+    "dir::rtl/nc_neuralcomputer.sv",
+    "dir::rtl/pc_network_2_2_2.sv"
+  ],
+
+  "FP_SIZING": "absolute",
+  "DIE_AREA": [0, 0, 1900, 1300],
+  "FP_CORE_UTIL": 20,
+
+  "MACROS": {
+    "neuron_core": {
+      "gds": [
+        "dir::runs/neuron_serial/final/gds/neuron_core.gds"
+      ],
+      "lef": [
+        "dir::runs/neuron_serial/final/lef/neuron_core.lef"
+      ],
+      "vh": [
+        "dir::runs/neuron_serial/final/vh/neuron_core.vh"
+      ],
+      "nl": [
+        "dir::runs/neuron_serial/final/nl/neuron_core.nl.v"
+      ],
+      "pnl": [
+        "dir::runs/neuron_serial/final/pnl/neuron_core.pnl.v"
+      ],
+      "spef": {
+        "min_*": [
+          "dir::runs/neuron_serial/final/spef/min/neuron_core.min.spef"
+        ],
+        "nom_*": [
+          "dir::runs/neuron_serial/final/spef/nom/neuron_core.nom.spef"
+        ],
+        "max_*": [
+          "dir::runs/neuron_serial/final/spef/max/neuron_core.max.spef"
+        ]
+      },
+      "lib": {
+        "nom_tt_025C_1v80": [
+          "dir::runs/neuron_serial/final/lib/nom_tt_025C_1v80/neuron_core__nom_tt_025C_1v80.lib"
+        ],
+        "nom_ss_100C_1v60": [
+          "dir::runs/neuron_serial/final/lib/nom_ss_100C_1v60/neuron_core__nom_ss_100C_1v60.lib"
+        ],
+        "nom_ff_n40C_1v95": [
+          "dir::runs/neuron_serial/final/lib/nom_ff_n40C_1v95/neuron_core__nom_ff_n40C_1v95.lib"
+        ],
+        "min_tt_025C_1v80": [
+          "dir::runs/neuron_serial/final/lib/min_tt_025C_1v80/neuron_core__min_tt_025C_1v80.lib"
+        ],
+        "min_ss_100C_1v60": [
+          "dir::runs/neuron_serial/final/lib/min_ss_100C_1v60/neuron_core__min_ss_100C_1v60.lib"
+        ],
+        "min_ff_n40C_1v95": [
+          "dir::runs/neuron_serial/final/lib/min_ff_n40C_1v95/neuron_core__min_ff_n40C_1v95.lib"
+        ],
+        "max_tt_025C_1v80": [
+          "dir::runs/neuron_serial/final/lib/max_tt_025C_1v80/neuron_core__max_tt_025C_1v80.lib"
+        ],
+        "max_ss_100C_1v60": [
+          "dir::runs/neuron_serial/final/lib/max_ss_100C_1v60/neuron_core__max_ss_100C_1v60.lib"
+        ],
+        "max_ff_n40C_1v95": [
+          "dir::runs/neuron_serial/final/lib/max_ff_n40C_1v95/neuron_core__max_ff_n40C_1v95.lib"
+        ]
+      },
+      "instances": {
+        "u_network.G_LAYER[0].G_LAYER_INST_L0.L.G_NEURON[0].u_core": {
+          "location": [78.2, 78.2],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[0].G_LAYER_INST_L0.L.G_NEURON[1].u_core": {
+          "location": [78.2, 703.8],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[0].u_core": {
+          "location": [703.8, 78.2],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[1].u_core": {
+          "location": [703.8, 703.8],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[2].G_LAYER_INST_LX.L.G_NEURON[0].u_core": {
+          "location": [1329.4, 78.2],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[2].G_LAYER_INST_LX.L.G_NEURON[1].u_core": {
+          "location": [1329.4, 703.8],
+          "orientation": "N"
+        }
+      }
+    }
+  },
+
+  "PDN_CONNECT_MACROS_TO_GRID": true,
+  "PDN_MACRO_CONNECTIONS": [
+    ".*u_core VPWR VGND VPWR VGND"
+  ]
+}

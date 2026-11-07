@@ -1,7 +1,19 @@
-gen_theta_init_pkg.py
+.DS_Store
 main.py
 
-archive/
 obj_dir/
-python_rtl/python_rtl/
-python_rtl/
+__pycache__/
+*.pyc
+runs/
+scripts/avg_replication.py
+
+tmp/
+
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz

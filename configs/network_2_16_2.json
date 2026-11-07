@@ -1,0 +1,234 @@
+{
+  "DESIGN_NAME": "pc_network_2162",
+  "PDK": "sky130A",
+  "STD_CELL_LIBRARY": "sky130_fd_sc_hd",
+  "CLOCK_PORT": "clk",
+  "CLOCK_PERIOD": 150,
+  "USE_SLANG": true,
+  "DRT_ANTENNA_REPAIR_ITERS": 10,
+  "PL_RESIZER_HOLD_SLACK_MARGIN": 0.2,
+  "GRT_RESIZER_HOLD_SLACK_MARGIN": 0.2,
+  "VERILOG_DEFINES": [
+    "USE_HARDENED_NEURON"
+  ],
+  "VERILOG_INCLUDE_DIRS": [
+    "dir::."
+  ],
+  "VERILOG_FILES": [
+    "dir::rtl/nc_neuralcomputer.sv",
+    "dir::rtl/pc_network_2_16_2.sv"
+  ],
+  "FP_SIZING": "absolute",
+  "DIE_AREA": [
+    0,
+    0,
+    4800,
+    3300
+  ],
+  "FP_CORE_UTIL": 20,
+  "MACROS": {
+    "neuron_core": {
+      "gds": [
+        "dir::runs/neuron_serial_16/final/gds/neuron_core.gds"
+      ],
+      "lef": [
+        "dir::runs/neuron_serial_16/final/lef/neuron_core.lef"
+      ],
+      "vh": [
+        "dir::runs/neuron_serial_16/final/vh/neuron_core.vh"
+      ],
+      "nl": [
+        "dir::runs/neuron_serial_16/final/nl/neuron_core.nl.v"
+      ],
+      "pnl": [
+        "dir::runs/neuron_serial_16/final/pnl/neuron_core.pnl.v"
+      ],
+      "spef": {
+        "min_*": [
+          "dir::runs/neuron_serial_16/final/spef/min/neuron_core.min.spef"
+        ],
+        "nom_*": [
+          "dir::runs/neuron_serial_16/final/spef/nom/neuron_core.nom.spef"
+        ],
+        "max_*": [
+          "dir::runs/neuron_serial_16/final/spef/max/neuron_core.max.spef"
+        ]
+      },
+      "lib": {
+        "nom_tt_025C_1v80": [
+          "dir::runs/neuron_serial_16/final/lib/nom_tt_025C_1v80/neuron_core__nom_tt_025C_1v80.lib"
+        ],
+        "nom_ss_100C_1v60": [
+          "dir::runs/neuron_serial_16/final/lib/nom_ss_100C_1v60/neuron_core__nom_ss_100C_1v60.lib"
+        ],
+        "nom_ff_n40C_1v95": [
+          "dir::runs/neuron_serial_16/final/lib/nom_ff_n40C_1v95/neuron_core__nom_ff_n40C_1v95.lib"
+        ],
+        "min_tt_025C_1v80": [
+          "dir::runs/neuron_serial_16/final/lib/min_tt_025C_1v80/neuron_core__min_tt_025C_1v80.lib"
+        ],
+        "min_ss_100C_1v60": [
+          "dir::runs/neuron_serial_16/final/lib/min_ss_100C_1v60/neuron_core__min_ss_100C_1v60.lib"
+        ],
+        "min_ff_n40C_1v95": [
+          "dir::runs/neuron_serial_16/final/lib/min_ff_n40C_1v95/neuron_core__min_ff_n40C_1v95.lib"
+        ],
+        "max_tt_025C_1v80": [
+          "dir::runs/neuron_serial_16/final/lib/max_tt_025C_1v80/neuron_core__max_tt_025C_1v80.lib"
+        ],
+        "max_ss_100C_1v60": [
+          "dir::runs/neuron_serial_16/final/lib/max_ss_100C_1v60/neuron_core__max_ss_100C_1v60.lib"
+        ],
+        "max_ff_n40C_1v95": [
+          "dir::runs/neuron_serial_16/final/lib/max_ff_n40C_1v95/neuron_core__max_ff_n40C_1v95.lib"
+        ]
+      },
+      "instances": {
+        "u_network.G_LAYER[0].G_LAYER_INST_L0.L.G_NEURON[0].u_core": {
+          "location": [
+            78.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[0].G_LAYER_INST_L0.L.G_NEURON[1].u_core": {
+          "location": [
+            78.2,
+            1642.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[0].u_core": {
+          "location": [
+            860.2,
+            78.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[1].u_core": {
+          "location": [
+            1642.2,
+            78.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[2].u_core": {
+          "location": [
+            2424.2,
+            78.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[3].u_core": {
+          "location": [
+            3206.2,
+            78.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[4].u_core": {
+          "location": [
+            860.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[5].u_core": {
+          "location": [
+            1642.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[6].u_core": {
+          "location": [
+            2424.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[7].u_core": {
+          "location": [
+            3206.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[8].u_core": {
+          "location": [
+            860.2,
+            1642.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[9].u_core": {
+          "location": [
+            1642.2,
+            1642.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[10].u_core": {
+          "location": [
+            2424.2,
+            1642.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[11].u_core": {
+          "location": [
+            3206.2,
+            1642.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[12].u_core": {
+          "location": [
+            860.2,
+            2424.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[13].u_core": {
+          "location": [
+            1642.2,
+            2424.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[14].u_core": {
+          "location": [
+            2424.2,
+            2424.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[1].G_LAYER_INST_L1.L.G_NEURON[15].u_core": {
+          "location": [
+            3206.2,
+            2424.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[2].G_LAYER_INST_LX.L.G_NEURON[0].u_core": {
+          "location": [
+            3988.2,
+            860.2
+          ],
+          "orientation": "N"
+        },
+        "u_network.G_LAYER[2].G_LAYER_INST_LX.L.G_NEURON[1].u_core": {
+          "location": [
+            3988.2,
+            1642.2
+          ],
+          "orientation": "N"
+        }
+      }
+    }
+  },
+  "PDN_CONNECT_MACROS_TO_GRID": true,
+  "PDN_MACRO_CONNECTIONS": [
+    ".*u_core VPWR VGND VPWR VGND"
+  ]
+}
