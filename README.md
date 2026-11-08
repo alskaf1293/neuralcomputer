@@ -13,182 +13,68 @@ The answer is YES. Predictive coding can be made in a way to compute gradients w
 
 5. Every neuron owns it's own MAC unit. The efficiencies come from the layout of the neural network. Since the cycles a neuron would have to process per tick is a linear function of the numbers of neurons it is connected to, asymptotically the convergence rate for larger networks becomes much smaller. If the number of connections for a single neuron (referred to in the paper as fan-in for the connections to the layer below, and fan-out for the connections to the layer above) is held constant, then the time to convergence does not change with network size. It is an interesting question whether the brain implements something similar.
 
-## Future Directions
+# Future Directions
 
 This predictive coding hardware is one step towards a program I call the inference engine. The idea is that von Neumann intermediary can be removed from the computational system, thereby achieving a computer that has is fully local, online, and parallel. The grander hypothesis is that achieving this would lead to a resolution of tasks considered difficult by Moravec's Paradox, which I have written about here: https://x.com/alskaf1293/status/2113007930845143244
 
 I also strongly believe that this could be a step forward in a program that looks at alternative computing paradigms, including a reversion towards analog computing, active matter, or superconducting circuits. Analog circuits already seem much better suited for running predictive coding because PC is by nature a continuous time, energy-based dynamical system. I would not be surprised if a much more efficient way to run PC could be found on an analog circuit compared to digital CMOS. The problem is that the current computing ecosystem is built on digital CMOS, along with the software and EDA toolkits that currently exist. Analog can come in the future, but a first order proof of PC efficiencies would be much more feasible on digital hardware, hence this repository.
 
-## Updates
+# Quick Start
 
-# Neural Computer RTL Simulation
-
-This repository contains the SystemVerilog implementation and verification tests for the Neural Computer architecture.
-
-The repository includes:
-
-- RTL modules
-- HardFloat dependencies
-- Verilator simulation scripts
-- Reference testbenches
-
-The goal is fully reproducible functional simulation using Verilator.
-
----
-
-# Quick Start (Reproduce Results)
-
-Clone the repository and run the reference tests.
+The repository gives two functionalities. Run the testbench to ensure the RTL converges to some sensible local minimum, and take larger networks from RTL to GDS. Nix is used to provide a project's development tools
 
 ```bash
-git clone https://github.com/alskaf1293/neuralcomputer
-cd neuralcomputer
-./scripts/test_all.sh
+nix develop path:.
+./scripts/run_test.sh env
 ```
 
-If everything is working correctly, you should see:
+This opens the shell using the project's Nix configuration, and checks that the tools are available
 
-```
-All reference tests passed.
-```
-
-The tests verify the full functional behavior of the system.
-
----
-
-# Requirements
-
-The simulation environment requires:
-
-- Verilator (5.x required)
-- g++
-- bash
-
-## Tested Environment
-
-Reference simulations were verified using:
-
-- Verilator 5.038
-- Apple clang 16.0.0 (g++ compatible)
-- macOS 15.3.1 (arm64)
-
-Only the following external tools are required:
-
-- Verilator
-- a C++ compiler (g++ / clang++)
-- bash
-
----
-
-# Installation
-
-## Ubuntu / Debian
+## RTL testing
 
 ```bash
-sudo apt update
-sudo apt install -y verilator g++ make bash
-```
-## macOS
+mkdir -p runs
 
-Install using Homebrew:
+./scripts/run_test.sh rtl tb/tb_scale_function.sv tb_scale_function \
+  -- \
+  +N_SAMPLES=8 +EPOCHS=20 +SEED=0 \
+  +SETTLE_TICKS=20 +TRAIN_TICKS=20 +EVAL_TICKS=50 \
+  +CSV=runs/rtl_smoke.csv
+```
+
+This creates a run directory and runs a three layered PC network with 2->4->3. It learns a fixed function
+
+$$
+y=A\, \operatorname{ReLU}(Bx), 
+\qquad
+x = \begin{bmatrix} x_1 \\ x_2 \end{bmatrix}.
+$$
+
+## RTL to GDS
+
+A PC neuron is represented by `neuron_core` RTL module in `nc_neuralcomputer.sv`. This is first hardened as a neuron macro, then used to create the full predictive coding network GDS files.
 
 ```bash
-brew install verilator
+librelane --design-dir . --run-tag neuron_serial \
+  configs/neuron_2_3.json
 ```
 
----
-
-# Running the Tests
-
-The repository provides a single command to run all verification tests.
+This hardens a neuron macro. We can build a 2->2->2 network:
 
 ```bash
-./scripts/test_all.sh
+librelane --design-dir . --run-tag network_serial \
+  configs/network_2_2_2.json
 ```
-Each testbench is compiled with Verilator and executed automatically.
 
-If all tests pass, the script prints:
+The results are stored in `runs/`. We can view the result with klayout
 
 ```bash
-All reference tests passed.
+klayout runs/network_serial/final/gds/pc_network_222.gds
 ```
 
----
+![2 → 2 → 2 network layout viewed in KLayout](figures/klayout_1.png)
 
-# Simulation Flow
+# Notes and To Do
 
-The simulation pipeline works as follows:
-
-1. test_all.sh launches the reference tests
-2. run_test.sh compiles the selected testbench
-3. Verilator generates a C++ simulation model
-4. The model is compiled and executed
-5. The testbench verifies functional correctness
-
-All required sources and dependencies are included in the repository.
-
----
-
-# HardFloat
-
-Floating point operations use the Berkeley HardFloat library.
-
-HardFloat source code is included directly in the repository under:
-
-```bash
-HardFloat/source/
-```
-
-No additional installation is required.
-
----
-
-# Troubleshooting
-
-## Permission Denied When Running Scripts
-
-If you see:
-
-```bash
-permission denied
-```
-
-run:
-
-```bash
-chmod +x scripts/*.sh
-```
-
----
-
-## Verilator Not Found
-
-Verify that Verilator is installed:
-
-```bash
-verilator --version
-```
-
-If not installed, follow the installation instructions above.
-
----
-
-# Reproducibility Notes
-
-This repository is designed so that:
-
-- all dependencies are included
-- simulation is deterministic
-- results can be reproduced using a single command
-
-The only required external tools are:
-
-Verilator  
-g++  
-bash  
-
----
-
-# License
-
-See LICENSE file.
+This paper implements the result on arxiv: https://arxiv.org/pdf/2603.18066
+At the present moment only smaller sizes have been tested for. Predictive coding and neuromorphic computing will eventually be the future of artificial intelligence, but it can only happen through persistent work of scaling hardware up.

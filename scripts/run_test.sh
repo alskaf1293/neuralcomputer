@@ -101,26 +101,6 @@ run_rtl() {
   "$ROOT/obj_dir/V${top}" "${sim_extra[@]}"
 }
 
-run_all() {
-  run_rtl tb/tb_final_function.sv tb_final_function
-  run_rtl tb/tb_pc3_tanh_reg.sv tb_pc3_tanh_reg
-
-  local config k0 k1 k2 max_k
-  for config in "3 4 2 8" "4 8 4 8" "8 16 8 16"; do
-    read -r k0 k1 k2 max_k <<< "$config"
-
-    run_rtl tb/tb_scale_function.sv tb_scale_function \
-      "-GK0=$k0" "-GK1=$k1" "-GK2=$k2" "-GMAX_K=$max_k" \
-      -- \
-      "+CSV=runs/scale_${k2}_${k1}_${k0}.csv" \
-      +N_SAMPLES=256 +SEED=0 \
-      +ALPHA=0.01 +GAMMA=0.04 \
-      +INFER_TICKS=200 +LEARN_TICKS=20 +EVAL_TICKS=300 +EPOCHS=25
-  done
-
-  echo "All reference and scaling tests passed."
-}
-
 run_python() {
   local -a eval_args=()
 
@@ -151,7 +131,6 @@ fi
 case "$mode" in
   env)    check_env ;;
   rtl)    run_rtl "$@" ;;
-  all)    run_all ;;
   python) run_python "$@" ;;
   *)      usage; exit 1 ;;
 esac
