@@ -21,7 +21,7 @@ I also strongly believe that this could be a step forward in a program that look
 
 # Quick Start
 
-The repository gives two functionalities. Run the testbench to ensure the RTL converges to some sensible local minimum, and take larger networks from RTL to GDS. Nix is used to provide a project's development tools
+The repository gives two functionalities. Run the testbench to ensure the RTL converges to some sensible local minimum, and take larger networks from RTL to GDS. Nix is used to provide a project's development tools. First install Nix
 
 ```bash
 nix develop path:.
@@ -45,7 +45,7 @@ mkdir -p runs
 This creates a run directory and runs a three layered PC network with 2->4->3. It learns a fixed function
 
 $$
-y=A\, \operatorname{ReLU}(Bx), 
+y=A\, \mathrm{ReLU}(Bx), 
 \qquad
 x = \begin{bmatrix} x_1 \\ x_2 \end{bmatrix}.
 $$
