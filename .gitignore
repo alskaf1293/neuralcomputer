@@ -1,19 +1,8 @@
 .DS_Store
-main.py
-
-obj_dir/
 __pycache__/
-*.pyc
-runs/
-scripts/avg_replication.py
-
 tmp/
 
-*.aux
-*.bbl
-*.blg
-*.fdb_latexmk
-*.fls
-*.log
-*.out
-*.synctex.gz
+obj_dir/
+runs/
+scripts/avg_replication.py
+AGENTS.md
