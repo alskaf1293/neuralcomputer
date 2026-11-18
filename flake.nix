@@ -17,7 +17,10 @@
           packages = [
             pkgs.haskellPackages.sv2v
             pkgs.verilator
-            pkgs.python3
+            (pkgs.python3.withPackages (ps: [
+              ps.numpy
+              ps.matplotlib
+            ]))
             pkgs.gcc
             pkgs.gnumake
 

@@ -7,8 +7,6 @@ typedef enum logic [2:0] {
   ACT_TANH   = 3'd2
 } act_kind_e;
 
-`timescale 1ns/1ps
-
 module hf_f2rec32 (
     input logic [31:0] in_ieee,
     output logic [32:0] out_rec
@@ -66,9 +64,6 @@ module hf_fma32 (
     output logic [4:0] flags
 );
     localparam int EXP=8, SIG=24;
-    // HardFloat mulAddRecFN has control bits for sign of addend and multiplier
-    // Ports: control, op, ... in some drops; here we use subOp flags as typical simple interface.
-    // Use provided module with parameters; some trees expect (op) rather than separate subOps.
     mulAddRecFN #(.expWidth(EXP), .sigWidth(SIG)) u (
         .control(1'b0),
         .op(opSel), // 2-bit {subMul, subAdd}
@@ -337,8 +332,6 @@ module neuron_core #(
     // Activation choices
     parameter act_kind_e ACT_KIND = ACT_RELU,
 
-    // N = dim(layer l+1) [presynaptic to this neuron, not counting bias]
-    // M = dim(layer l-1) [back inputs coming into this neuron]
     parameter int J   = 2,
     parameter int K   = 3,
     parameter int EXP = 8,
@@ -388,23 +381,38 @@ module neuron_core #(
     // ----------------- widths and constants -----------------
     localparam int   RECW   = EXP + SIG + 1;
     localparam [2:0] RM_RNE = 3'd0;
-    localparam int   J_EFF  = J + 1;     // +1 bias lane at index N
+    localparam int   J_EFF  = J + 1;     // for bias lane
 
-    // recFN constants
+    // ------------- indices and small regs -------------------
+    logic [$clog2(J_EFF)-1:0]  j;
+    logic [$clog2(K_SAFE)-1:0] r;
+
+    // ------------- recFN constants --------------------------
     logic [RECW-1:0] rec_zero, rec_one, rec_bias_lr;
     hf_f2rec32 U_REC_ZERO (.in_ieee(32'h0000_0000),           .out_rec(rec_zero));
     hf_f2rec32 U_REC_ONE  (.in_ieee(32'h3F800000),            .out_rec(rec_one));
     hf_f2rec32 U_REC_BLR  (.in_ieee(BIAS_LR_SCALE_IEEE),      .out_rec(rec_bias_lr));
-
-    // ------------- indices and small regs -------------------
-    logic [$clog2(J_EFF)-1:0]  j;                   // internal counter (includes bias lane)
-    logic [$clog2(K_SAFE)-1:0] r;
 
     // ------------- IEEE->recFN params -----------------------
     logic [RECW-1:0] alpha, gamma, x_obs;
     hf_f2rec32 U_A (.in_ieee(ALPHA_IEEE), .out_rec(alpha));
     hf_f2rec32 U_G (.in_ieee(GAMMA_IEEE), .out_rec(gamma));
     hf_f2rec32 U_XOBS (.in_ieee(x_obs_ieee), .out_rec(x_obs));
+
+    // ------------- θ initialization (J weights + 1 bias) ---
+    logic [RECW-1:0] theta [J_EFF];
+    logic [RECW-1:0] theta_preset_rec [J];
+
+    for (genvar preset_idx=0; preset_idx<J; preset_idx++) begin : G_THETA_PRESET
+      hf_f2rec32 u_p (
+        .in_ieee(THETA_PRESET_IEEE[preset_idx]),
+        .out_rec(theta_preset_rec[preset_idx])
+      );
+    end
+
+    // ------------- bias initialization ---------------------
+    logic [RECW-1:0] theta_bias_init;
+    hf_f2rec32 U_BIAS_INIT (.in_ieee(BIAS_INIT_IEEE), .out_rec(theta_bias_init));
 
     // ------------- pre-activation state and clamp -------------
     logic [RECW-1:0] x_i, x_i_init_rec, x_i_eff;
@@ -429,29 +437,11 @@ module neuron_core #(
     // --- mac op ---
     logic [1:0] mac_op;
 
-    // ------------- θ storage and presets (N true + 1 bias) ---
-    logic [RECW-1:0] theta [J_EFF];
-    logic [RECW-1:0] theta_preset_rec [J];
-
-    genvar preset_idx;
-    generate
-      for (preset_idx = 0; preset_idx < J; preset_idx = preset_idx + 1) begin : G_THETA_PRESET
-        hf_f2rec32 u_p (
-          .in_ieee(THETA_PRESET_IEEE[preset_idx]),
-          .out_rec(theta_preset_rec[preset_idx])
-        );
-      end
-    endgenerate
-
-    // Bias init (default 0.0 unless overridden)
-    logic [RECW-1:0] theta_bias_init;
-    hf_f2rec32 U_BIAS_INIT (.in_ieee(BIAS_INIT_IEEE), .out_rec(theta_bias_init));
-
     // ------------- presynaptic buffer + bias lane -----------
     logic [RECW-1:0] x_col [J];
     logic [$clog2(RECW)-1:0] rx_bit;
 
-        logic [RECW-1:0] back_tx [J];
+    logic [RECW-1:0] back_tx [J];
     logic [RECW-1:0] back_rx [K];
 
     logic [$clog2(RECW)-1:0] back_bit;
@@ -480,27 +470,26 @@ module neuron_core #(
       .fp_rec(xj_actp_unused)
     );
 
-    // IMPORTANT: bias lane uses constant 1 as the feature
+    // bias lane uses constant 1 as the feature
     wire [RECW-1:0] xj_act = is_bias_idx ? rec_one : xj_act_raw;
 
-    // --------- back_sum accumulate over M ----------
+    // back accumulate over M
     logic [RECW-1:0] back_sum_c_in;
     assign back_sum_c_in = (r == '0) ? rec_zero : back_sum;
 
-    // gate: back_eff = φ'(x_i) * back_sum
+    // back_eff = φ'(x_i) * back_sum
     logic [RECW-1:0] back_eff;
 
-    // --------- prediction μ_i accumulation over j in [0..N] (bias at N) ----------
-    logic [RECW-1:0] mu_c_in, pred_mac_out; logic [4:0] pred_exc;
+    // prediction μ_i accumulation over j in [0..J] (bias at J)
+    logic [RECW-1:0] mu_c_in, pred_mac_out;
     assign mu_c_in = (j == '0) ? rec_zero : mu_acc;
 
     // Δx_i = γ*(back_eff - ε_i)
-    logic [RECW-1:0] sub_back_minus_eps, state_out;
-    logic [4:0] state_exc;
+    // sub_back_minus_eps stores the update direction: f'(x_i) back_sum - ε_i
+    logic [RECW-1:0] sub_back_minus_eps;
 
     // --------- θ update: θ_j <- θ_j + m_i_eff * act_j  (bias learns slower / can freeze)
     logic [RECW-1:0] m_i_bias_scaled, m_i_eff;
-    logic [RECW-1:0] weight_out;        logic [4:0] weight_exc;
 
     // m_i is just latched mul_ae_out for clarity
     // bias lane uses scaled m_i
@@ -511,7 +500,7 @@ module neuron_core #(
       assign x_out[destination] = x_i_eff[rx_bit];
     end
 
-    // -------------------- FSM --------------------
+    // FSM
     typedef enum logic [3:0] {
       S_IDLE,
       S_RX,
@@ -530,7 +519,7 @@ module neuron_core #(
 
     st_e st;
 
-        // Shared floating-point MAC.
+    // Shared floating-point MAC.
     logic [RECW-1:0] mac_a, mac_b, mac_c;
     logic [RECW-1:0] mac_out;
     logic [4:0] mac_exc;
@@ -622,14 +611,6 @@ module neuron_core #(
       .exceptionFlags(mac_exc)
     );
 
-    assign pred_mac_out = mac_out;
-    assign weight_out   = mac_out;
-    assign state_out    = mac_out;
-
-    assign pred_exc   = mac_exc;
-    assign weight_exc = mac_exc;
-    assign state_exc  = mac_exc;
-
     // Edge detect (posedge aligned)
     logic start_q;
     always_ff @(posedge clk) begin
@@ -701,9 +682,9 @@ module neuron_core #(
             end
           end
 
-          // accumulate μ_i over j in [0..N] (last is bias)
+          // accumulate μ_i over j in [0..J] (last is bias)
           S_PRED: begin
-            mu_acc <= pred_mac_out;
+            mu_acc <= mac_out;
             if (j == J_EFF-1) begin
               st <= S_ERR;
             end else begin
@@ -769,10 +750,10 @@ module neuron_core #(
             st              <= S_WUP;
           end
 
-          // weight updates over j in [0..N] (includes bias lane; optional freeze)
+          // weight updates over j in [0..J] (includes bias lane; optional freeze)
           S_WUP: begin
             if (learn_en && !(FREEZE_BIAS && (j == J))) begin
-              theta[j] <= weight_out;
+              theta[j] <= mac_out;
             end
             if (j == J_EFF-1) begin
               st <= S_BACK_GATE;
@@ -794,7 +775,7 @@ module neuron_core #(
           // state update (or hard clamp) and emit single-cycle done_o
           S_STATE: begin
             if (CLAMP_HARD && x_set_en) x_i <= x_obs;
-            else                        x_i <= state_out;
+            else                        x_i <= mac_out;
             busy_o <= 1'b0;
             done_o <= 1'b1;
             st     <= S_IDLE;
