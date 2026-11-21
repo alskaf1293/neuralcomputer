@@ -378,28 +378,23 @@ module neuron_core #(
     input  logic                     x_set_en,
     input  logic [31:0]              x_obs_ieee
 );
-    // ----------------- widths and constants -----------------
+    // -------- widths and constants --------
     localparam int   RECW   = EXP + SIG + 1;
     localparam [2:0] RM_RNE = 3'd0;
     localparam int   J_EFF  = J + 1;     // for bias lane
 
-    // ------------- indices and small regs -------------------
-    logic [$clog2(J_EFF)-1:0]  j;
-    logic [$clog2(K_SAFE)-1:0] r;
-
-    // ------------- recFN constants --------------------------
     logic [RECW-1:0] rec_zero, rec_one, rec_bias_lr;
     hf_f2rec32 U_REC_ZERO (.in_ieee(32'h0000_0000),           .out_rec(rec_zero));
     hf_f2rec32 U_REC_ONE  (.in_ieee(32'h3F800000),            .out_rec(rec_one));
     hf_f2rec32 U_REC_BLR  (.in_ieee(BIAS_LR_SCALE_IEEE),      .out_rec(rec_bias_lr));
 
-    // ------------- IEEE->recFN params -----------------------
     logic [RECW-1:0] alpha, gamma, x_obs;
     hf_f2rec32 U_A (.in_ieee(ALPHA_IEEE), .out_rec(alpha));
     hf_f2rec32 U_G (.in_ieee(GAMMA_IEEE), .out_rec(gamma));
     hf_f2rec32 U_XOBS (.in_ieee(x_obs_ieee), .out_rec(x_obs));
 
-    // ------------- θ initialization (J weights + 1 bias) ---
+    // -------- stored activity and weights --------
+    // θ initialization (J weights + 1 bias)
     logic [RECW-1:0] theta [J_EFF];
     logic [RECW-1:0] theta_preset_rec [J];
 
@@ -410,15 +405,16 @@ module neuron_core #(
       );
     end
 
-    // ------------- bias initialization ---------------------
+    // bias initialization
     logic [RECW-1:0] theta_bias_init;
     hf_f2rec32 U_BIAS_INIT (.in_ieee(BIAS_INIT_IEEE), .out_rec(theta_bias_init));
 
-    // ------------- pre-activation state and clamp -------------
-    logic [RECW-1:0] x_i, x_i_init_rec, x_i_eff;
+    // activity x_i, clamp, reset value
+    logic [RECW-1:0] x_i, x_i_eff, x_i_init_rec;
     hf_f2rec32 U_XI0 (.in_ieee(X_I_INIT_IEEE), .out_rec(x_i_init_rec));
     assign x_i_eff = (x_set_en ? x_obs : x_i);
 
+    // φ'(x_i), used in activity update
     logic [RECW-1:0] phi_xi_unused, phi_prime_xi;
 
     activation32 #(
@@ -430,14 +426,7 @@ module neuron_core #(
       .fp_rec(phi_prime_xi)
     );
 
-    // ------------- accumulators -----------------------------
-    logic [RECW-1:0] mu_acc, eps_i, m_i;
-    logic [RECW-1:0] back_sum;
-
-    // --- mac op ---
-    logic [1:0] mac_op;
-
-    // ------------- presynaptic buffer + bias lane -----------
+    // -------- communication --------
     logic [RECW-1:0] x_col [J];
     logic [$clog2(RECW)-1:0] rx_bit;
 
@@ -455,9 +444,13 @@ module neuron_core #(
       assign back_vec[b] = back_tx[b][back_bit];
     end
 
-    // Select activation for lane j (strict configurable φ for j<N; const 1 for bias lane j==N)
-    wire is_bias_idx = (j == J);
-    wire [RECW-1:0] xj_in_feat = is_bias_idx ? rec_one : x_col[(j < J) ? j : 0];
+    for (genvar destination=0; destination<K; destination++) begin : G_STATE_FANOUT
+      assign x_out[destination] = x_i_eff[rx_bit];
+    end
+
+    // -------- prediction --------
+    logic [$clog2(J_EFF)-1:0]  j;
+    wire [RECW-1:0] xj_in_feat = x_col[(j < J) ? j : 0];
 
     logic [RECW-1:0] xj_act_raw, xj_actp_unused;
 
@@ -471,131 +464,38 @@ module neuron_core #(
     );
 
     // bias lane uses constant 1 as the feature
+    wire is_bias_idx = (j == J);
     wire [RECW-1:0] xj_act = is_bias_idx ? rec_one : xj_act_raw;
 
-    // back accumulate over M
-    logic [RECW-1:0] back_sum_c_in;
-    assign back_sum_c_in = (r == '0) ? rec_zero : back_sum;
-
-    // back_eff = φ'(x_i) * back_sum
-    logic [RECW-1:0] back_eff;
-
-    // prediction μ_i accumulation over j in [0..J] (bias at J)
-    logic [RECW-1:0] mu_c_in, pred_mac_out;
+    logic [RECW-1:0] mu_acc, mu_c_in;
     assign mu_c_in = (j == '0) ? rec_zero : mu_acc;
 
+    // -------- error --------
+    logic [RECW-1:0] eps_i;
+
+    // -------- feedback --------
+    logic [$clog2(K_SAFE)-1:0] r;
+    logic [RECW-1:0] back_acc, back_sum_c_in;
+    assign back_sum_c_in = (r == '0) ? rec_zero : back_acc;
+
+    // back_eff = φ'(x_i) * back_acc
+    logic [RECW-1:0] back_eff;
+
+    // -------- activity update --------
     // Δx_i = γ*(back_eff - ε_i)
-    // sub_back_minus_eps stores the update direction: f'(x_i) back_sum - ε_i
     logic [RECW-1:0] sub_back_minus_eps;
 
-    // --------- θ update: θ_j <- θ_j + m_i_eff * act_j  (bias learns slower / can freeze)
-    logic [RECW-1:0] m_i_bias_scaled, m_i_eff;
+    // -------- weight update --------
+    // θ update: θ_j <- θ_j + m_i_eff * act_j  (bias learns slower / can freeze)
+    logic [RECW-1:0] m_i, m_i_bias_scaled, m_i_eff;
 
-    // m_i is just latched mul_ae_out for clarity
-    // bias lane uses scaled m_i
     assign m_i_eff = (j == J) ? m_i_bias_scaled : m_i;
 
-    // --------- back vector: back_vec[j] = θ_j * ε_i for j in [0..N-1] ----------
-    for (genvar destination=0; destination<K; destination++) begin : G_STATE_FANOUT
-      assign x_out[destination] = x_i_eff[rx_bit];
-    end
-
-    // FSM
-    typedef enum logic [3:0] {
-      S_IDLE,
-      S_RX,
-      S_PRED,
-      S_ERR,
-      S_LEARN,
-      S_BACKSUM,
-      S_BACKVEC,
-      S_BACK_RX,
-      S_BIAS_SCALE,
-      S_WUP,
-      S_BACK_GATE,
-      S_STATE_DIFF,
-      S_STATE
-    } st_e;
-
-    st_e st;
-
-    // Shared floating-point MAC.
+    // -------- MAC signals and FMA --------
+    logic [1:0] mac_op;
     logic [RECW-1:0] mac_a, mac_b, mac_c;
     logic [RECW-1:0] mac_out;
     logic [4:0] mac_exc;
-
-    always_comb begin
-      mac_a = rec_zero;
-      mac_b = rec_zero;
-      mac_c = rec_zero;
-      mac_op = 2'b00;
-
-      case (st)
-        S_PRED: begin
-          mac_a = theta[j];
-          mac_b = xj_act;
-          mac_c = mu_c_in;
-        end
-
-        S_WUP: begin
-          mac_a = m_i_eff;
-          mac_b = xj_act;
-          mac_c = theta[j];
-        end
-
-        S_STATE: begin
-          mac_a = gamma;
-          mac_b = sub_back_minus_eps;
-          mac_c = x_i;
-        end
-
-        S_BACKSUM: begin
-          mac_a = back_rx[r];
-          mac_b = rec_one;
-          mac_c = back_sum_c_in;
-        end
-
-        S_BACKVEC: begin
-          mac_a = theta[(j < J) ? j : 0];
-          mac_b = eps_i;
-          mac_c = rec_zero;
-        end
-
-        S_ERR: begin
-          mac_a  = x_i_eff;
-          mac_b  = rec_one;
-          mac_c  = mu_acc;
-          mac_op = 2'b01; // x_i_eff * 1 - mu_acc
-        end
-
-        S_LEARN: begin
-          mac_a = alpha;
-          mac_b = eps_i;
-          mac_c = rec_zero;
-        end
-
-        S_BACK_GATE: begin
-          mac_a = back_sum;
-          mac_b = phi_prime_xi;
-          mac_c = rec_zero;
-        end
-
-        S_BIAS_SCALE: begin
-          mac_a = m_i;
-          mac_b = rec_bias_lr;
-          mac_c = rec_zero;
-        end
-
-        S_STATE_DIFF: begin
-          mac_a  = back_eff;
-          mac_b  = rec_one;
-          mac_c  = eps_i;
-          mac_op = 2'b01;
-        end
-
-        default: begin end
-      endcase
-    end
 
     mulAddRecFN #(
       .expWidth(EXP),
@@ -611,36 +511,143 @@ module neuron_core #(
       .exceptionFlags(mac_exc)
     );
 
-    // Edge detect (posedge aligned)
-    logic start_q;
-    always_ff @(posedge clk) begin
-      if (!rst_n) start_q <= 1'b0;
-      else        start_q <= start_tick;
+    // -------- FSM --------
+    typedef enum logic [3:0] {
+      // Wait for a tick and receive activities
+      S_IDLE,
+      S_RECEIVE_ACTIVITIES,
+
+      // Prediction
+      S_PREDICT,
+
+      // Error
+      S_ERROR,
+
+      // Prepare, exchange, and sum feedback
+      S_PREPARE_FEEDBACK,
+      S_EXCHANGE_FEEDBACK,
+      S_SUM_FEEDBACK,
+
+      // Activity update
+      S_GATE_FEEDBACK,
+      S_ACTIVITY_DIRECTION,
+      S_UPDATE_ACTIVITY,
+
+      // Weight update
+      S_SCALE_ERROR,
+      S_SCALE_BIAS_INCREMENT,
+      S_UPDATE_WEIGHTS
+    } st_e;
+
+    st_e st;
+
+    // -------- combinational --------
+    always_comb begin
+      mac_a = rec_zero;
+      mac_b = rec_zero;
+      mac_c = rec_zero;
+      mac_op = 2'b00;
+
+      case (st)
+        // Prediction
+        S_PREDICT: begin
+          mac_a = theta[j];
+          mac_b = xj_act;
+          mac_c = mu_c_in;
+        end
+
+        // Error
+        S_ERROR: begin
+          mac_a = x_i_eff;
+          mac_b = rec_one;
+          mac_c = mu_acc;
+          mac_op = 2'b01;
+        end
+
+        // Prepare and sum feedback
+        S_PREPARE_FEEDBACK: begin
+          mac_a = theta[(j < J) ? j : 0];
+          mac_b = eps_i;
+          mac_c = rec_zero;
+        end
+
+        S_SUM_FEEDBACK: begin
+          mac_a = back_rx[r];
+          mac_b = rec_one;
+          mac_c = back_sum_c_in;
+        end
+
+        // Activity update
+        S_GATE_FEEDBACK: begin
+          mac_a = back_acc;
+          mac_b = phi_prime_xi;
+          mac_c = rec_zero;
+        end
+
+        S_ACTIVITY_DIRECTION: begin
+          mac_a = back_eff;
+          mac_b = rec_one;
+          mac_c = eps_i;
+          mac_op = 2'b01;
+        end
+
+        S_UPDATE_ACTIVITY: begin
+          mac_a = gamma;
+          mac_b = sub_back_minus_eps;
+          mac_c = x_i;
+        end
+
+        // Weight update
+        S_SCALE_ERROR: begin
+          mac_a = alpha;
+          mac_b = eps_i;
+          mac_c = rec_zero;
+        end
+
+        S_SCALE_BIAS_INCREMENT: begin
+          mac_a = m_i;
+          mac_b = rec_bias_lr;
+          mac_c = rec_zero;
+        end
+
+        S_UPDATE_WEIGHTS: begin
+          mac_a = m_i_eff;
+          mac_b = xj_act;
+          mac_c = theta[j];
+        end
+
+        default: begin end
+      endcase
     end
+
+    // -------- sequential --------
+    // edge detect
+    logic start_q;
     wire start_edge = start_tick & ~start_q;
 
-    // -------------------- sequential --------------------
     always_ff @(posedge clk) begin
       if (!rst_n) begin
-        st               <= S_IDLE;
-        j                <= '0;
-        r                <= '0;
-        rx_bit           <= '0;
-        tick_cycle <= '0;
-        back_bit   <= '0;
-        busy_o           <= 1'b0;
-        done_o           <= 1'b0;
-        mu_acc           <= rec_zero;
-        eps_i            <= rec_zero;
-        m_i              <= rec_zero;
-        back_sum         <= rec_zero;
-        m_i_bias_scaled <= rec_zero;
-        back_eff <= rec_zero;
+        start_q            <= 1'b0;
+        st                 <= S_IDLE;
+        j                  <= '0;
+        r                  <= '0;
+        rx_bit             <= '0;
+        tick_cycle         <= '0;
+        back_bit           <= '0;
+        busy_o             <= 1'b0;
+        done_o             <= 1'b0;
+        mu_acc             <= rec_zero;
+        eps_i              <= rec_zero;
+        m_i                <= rec_zero;
+        back_acc           <= rec_zero;
+        m_i_bias_scaled    <= rec_zero;
+        back_eff           <= rec_zero;
         sub_back_minus_eps <= rec_zero;
 
-        // init θ: copy presets for [0..N-1], init bias
-        for (int k=0; k<J; k++) theta[k]      <= theta_preset_rec[k];
-        theta[J] <= theta_bias_init; // bias slot
+        // Initialize weights and bias.
+        for (int k=0; k<J; k++)
+          theta[k] <= theta_preset_rec[k];
+        theta[J] <= theta_bias_init;
 
         for (int k=0; k<J; k++) x_col[k] <= rec_zero;
         for (int k=0; k<J; k++) back_tx[k] <= rec_zero;
@@ -648,137 +655,139 @@ module neuron_core #(
 
         x_i <= x_i_init_rec;
       end else begin
-        // per-cycle defaults
-        done_o           <= 1'b0;
-        if (busy_o && tick_cycle < BACK_START_CYCLE) begin
+        done_o <= 1'b0;
+        start_q <= start_tick;
+
+        if (busy_o && tick_cycle < BACK_START_CYCLE)
           tick_cycle <= tick_cycle + 1'b1;
-        end
+
         unique case (st)
+          // Wait for a tick and receive activities.
           S_IDLE: begin
             busy_o <= 1'b0;
 
             if (start_edge) begin
               busy_o     <= 1'b1;
               mu_acc     <= rec_zero;
-              back_sum   <= rec_zero;
+              back_acc   <= rec_zero;
               j          <= '0;
               r          <= '0;
               rx_bit     <= '0;
               tick_cycle <= '0;
               back_bit   <= '0;
-              st         <= S_RX;
+              st         <= S_RECEIVE_ACTIVITIES;
             end
           end
 
-          S_RX: begin
-            for (int k=0; k<J; k++) begin
+          S_RECEIVE_ACTIVITIES: begin
+            for (int k=0; k<J; k++)
               x_col[k][rx_bit] <= x_vec[k];
-            end
 
-            if (rx_bit == RECW-1) begin
-              st <= S_PRED;
-            end else begin
+            if (rx_bit == RECW-1)
+              st <= S_PREDICT;
+            else
               rx_bit <= rx_bit + 1'b1;
-            end
           end
 
-          // accumulate μ_i over j in [0..J] (last is bias)
-          S_PRED: begin
+          // Prediction.
+          S_PREDICT: begin
             mu_acc <= mac_out;
-            if (j == J_EFF-1) begin
-              st <= S_ERR;
-            end else begin
-              j <= j + 1;
-            end
+
+            if (j == J_EFF-1)
+              st <= S_ERROR;
+            else
+              j <= j + 1'b1;
           end
 
-          // compute ε_i and m_i; reset back_sum accumulation
-          S_ERR: begin
+          // Prediction error.
+          S_ERROR: begin
             eps_i <= mac_out;
-            st    <= S_LEARN;
+            st    <= S_SCALE_ERROR;
           end
 
-          S_LEARN: begin
-            m_i      <= mac_out;
-            j        <= '0;
-            r        <= '0;
-            back_sum <= rec_zero;
-            st       <= S_BACKVEC;
-          end
-
-          S_BACKVEC: begin
-            if (j < J) begin
+          // Prepare, exchange, and sum feedback.
+          S_PREPARE_FEEDBACK: begin
+            if (j < J)
               back_tx[j] <= mac_out;
-            end
 
             if (j == J-1) begin
               j        <= '0;
               back_bit <= '0;
-              st       <= S_BACK_RX;
+              st       <= S_EXCHANGE_FEEDBACK;
             end else begin
               j <= j + 1'b1;
             end
           end
 
-          S_BACK_RX: begin
+          S_EXCHANGE_FEEDBACK: begin
             if (tick_cycle == BACK_START_CYCLE) begin
-              for (int k=0; k<K; k++) begin
+              for (int k=0; k<K; k++)
                 back_rx[k][back_bit] <= back_in[k];
-              end
 
               if (back_bit == RECW-1) begin
-                r                <= '0;
-                st               <= S_BACKSUM;
+                r  <= '0;
+                st <= S_SUM_FEEDBACK;
               end else begin
                 back_bit <= back_bit + 1'b1;
               end
             end
           end
-          
-          S_BACKSUM: begin
-            back_sum <= mac_out;
+
+          S_SUM_FEEDBACK: begin
+            back_acc <= mac_out;
+
             if (r == K-1) begin
               j  <= '0;
-              st <= S_BIAS_SCALE;
+              st <= S_SCALE_BIAS_INCREMENT;
             end else begin
-              r <= r + 1;
+              r <= r + 1'b1;
             end
           end
 
-          S_BIAS_SCALE: begin
-            m_i_bias_scaled <= mac_out;
-            st              <= S_WUP;
-          end
-
-          // weight updates over j in [0..J] (includes bias lane; optional freeze)
-          S_WUP: begin
-            if (learn_en && !(FREEZE_BIAS && (j == J))) begin
-              theta[j] <= mac_out;
-            end
-            if (j == J_EFF-1) begin
-              st <= S_BACK_GATE;
-            end else begin
-              j <= j + 1;
-            end
-          end
-
-          S_BACK_GATE: begin
+          // Activity update.
+          S_GATE_FEEDBACK: begin
             back_eff <= mac_out;
-            st       <= S_STATE_DIFF;
+            st       <= S_ACTIVITY_DIRECTION;
           end
 
-          S_STATE_DIFF: begin
+          S_ACTIVITY_DIRECTION: begin
             sub_back_minus_eps <= mac_out;
-            st                 <= S_STATE;
+            st                 <= S_UPDATE_ACTIVITY;
           end
 
-          // state update (or hard clamp) and emit single-cycle done_o
-          S_STATE: begin
-            if (CLAMP_HARD && x_set_en) x_i <= x_obs;
-            else                        x_i <= mac_out;
+          S_UPDATE_ACTIVITY: begin
+            if (CLAMP_HARD && x_set_en)
+              x_i <= x_obs;
+            else
+              x_i <= mac_out;
+
             busy_o <= 1'b0;
             done_o <= 1'b1;
             st     <= S_IDLE;
+          end
+
+          // Weight update.
+          S_SCALE_ERROR: begin
+            m_i      <= mac_out;
+            j        <= '0;
+            r        <= '0;
+            back_acc <= rec_zero;
+            st       <= S_PREPARE_FEEDBACK;
+          end
+
+          S_SCALE_BIAS_INCREMENT: begin
+            m_i_bias_scaled <= mac_out;
+            st              <= S_UPDATE_WEIGHTS;
+          end
+
+          S_UPDATE_WEIGHTS: begin
+            if (learn_en && !(FREEZE_BIAS && (j == J)))
+              theta[j] <= mac_out;
+
+            if (j == J_EFF-1)
+              st <= S_GATE_FEEDBACK;
+            else
+              j <= j + 1'b1;
           end
         endcase
       end
