@@ -133,11 +133,11 @@ External observations can be clamped to selected neurons. In the supervised test
 
 ## How each one works
 
-<u>widths and constants</u>
+### widths and constants
 
 Initializes constants, and converts some values like $0$, $1$, $\alpha$, $\gamma$ and converts them from the IEEE representation to HardFloat’s internal representation recFN
 
-<u>stored activity and weights</u>
+### stored activity and weights
 
 Initializes $θ$, which has $J+1$ elements because of the $J$ weights connecting to the $J$ neurons in the layer above and the bias. Initializes converters from the initial $θ$’s IEEE to recFN, as well as the bias. When the reset is asserted, the clocked FSM copies the presets into `theta`:
 
@@ -152,7 +152,7 @@ theta[J] <= theta_bias_init;
 
 Subsequently, `x_i`, the core’s activity, is initialized. Similarly to the $\theta$ case, the converter from initial `x_i`’s IEEE to recFN is initialized and stored as `x_i_init_rec`, and `x_i_eff` overrides `x_i` with `x_obs` if the clamp `x_set_en` is enabled. Subsequently, `x_i_eff` is passed through the activation `ACT_LOCAL_FEAT` and stored in `phi_prime_xi`. Both `x_i_eff` and `phi_prime_xi` are used later.
 
-<u>communication</u>
+### communication
 
 `x_col`, `back_tx`, and `back_rx` are arrays of registers. Each array element holds one complete RECW-bit value. During `S_RECEIVE_ACTIVITIES`, the assignment runs at each clock edge
 
@@ -182,7 +182,7 @@ assign back_vec[j] = back_tx[j][back_bit];
 back_rx[k][back_bit] <= back_in[k];
 ```
 
-<u>prediction</u>
+### prediction
 
 `j` is the counter that loops through the $J$ activities from the layer above. `xj_in_feat` selects the jth element from `x_col[j]` and that feature is passed through an activation to get `xj_act_raw`. `xj_act` uses `xj_act_raw` for an ordinary input and `1` for the bias lane.
 
@@ -211,13 +211,13 @@ mac_out = theta[J] × 1 + mu_c_in
 store final prediction in mu_acc
 ```
 
-<u>error</u>
+### error
 
 initializes register for the error. In the S_ERROR stage, the MAC calculates the difference. At the clock edge, the FSM stores it:
 
 `eps_i <= mac_out;`
 
-<u>feedback</u>
+### feedback
 
 feedback stage is summed similarly to $\mu$ in the prediction stage. Each neuron below sends a weighted precision-error contribution
 
@@ -243,7 +243,7 @@ At the clock edge, the FSM stores `mac_out` in `back_acc`. After all $K$ contrib
 ```math
 \text{back\_eff}=f'(x_{i,eff})\text{back\_acc}
 ```
-<u>activity update</u>
+### activity update
 
 `sub_back_minus_eps` stores the direction of the activity update:
 
@@ -270,7 +270,7 @@ and stores that result in the next clock edge. So the complete activity update i
 ```math
 x_i^{\mathrm{new}} = x_i + \gamma\left(\text{back\_eff}-\epsilon_i\right).
 ```
-<u>weight update</u>
+### weight update
 
 Declares three signals `m_i`, `m_i_bias_scaled`, `m_i_eff`. `m_i` stores $\alpha\epsilon_i$, `m_i_bias_scaled` stores `m_i` multiplied by the bias learning-rate scale. `m_i_eff` is the selected increment for the current lane. The FSM carries out the calculation in three stages:
 
@@ -291,11 +291,11 @@ declares the FMA signals and FMA. the FMA performs computation like
 
 `mac_out = mac_a × mac_b + mac_c`
 
-<u>combinational</u>
+### combinational
 
 combinational circuitry
 
-<u>sequential</u>
+### sequential
 
 sequential circuitry
 
