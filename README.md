@@ -247,9 +247,9 @@ At the clock edge, the FSM stores `mac_out` in `back_acc`. After all $K$ contrib
 
 `sub_back_minus_eps` stores the direction of the activity update:
 
-$$
+```math
 \text{sub\_back\_minus\_eps}=\text{back\_eff}-\epsilon_i
-$$
+```
 
 In `S_ACTIVITY_DIRECTION`, the MAC calculates
 
@@ -267,9 +267,9 @@ Then, in `S_UPDATE_ACTIVITY`, the MAC calculates:
 
 and stores that result in the next clock edge. So the complete activity update is:
 
-$$
+```math
 x_i^{\mathrm{new}} = x_i + \gamma\left(\text{back\_eff}-\epsilon_i\right).
-$$
+```
 <u>weight update</u>
 
 Declares three signals `m_i`, `m_i_bias_scaled`, `m_i_eff`. `m_i` stores $\alpha\epsilon_i$, `m_i_bias_scaled` stores `m_i` multiplied by the bias learning-rate scale. `m_i_eff` is the selected increment for the current lane. The FSM carries out the calculation in three stages:
