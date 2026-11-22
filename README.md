@@ -275,13 +275,16 @@ x_i^{\mathrm{new}} = x_i + \gamma\left(\text{back\_eff}-\epsilon_i\right).
 Declares three signals `m_i`, `m_i_bias_scaled`, `m_i_eff`. `m_i` stores $\alpha\epsilon_i$, `m_i_bias_scaled` stores `m_i` multiplied by the bias learning-rate scale. `m_i_eff` is the selected increment for the current lane. The FSM carries out the calculation in three stages:
 
 `S_SCALE_ERROR` uses the MAC to calculate and store
-$$
+```math
 m_i = \alpha\epsilon_i.
-$$
+```
 `S_SCALE_BIAS_INCREMENT` calculates and stores
-$ m_{i,\mathrm{bias}}=m_i\times\text{bias scale}$
+$m_{i,\mathrm{bias}}=m_i\times\text{bias scale}$
 `S_UPDATE_WEIGHTS` processes each weight, then the bias
-$\theta[j]\leftarrow\theta[j]+m_{i,\mathrm{eff}}\times\text{xj\_act}$
+
+```math
+\theta[j]\leftarrow\theta[j]+m_{i,\mathrm{eff}}\times\text{xj\_act}
+```
 
 FMA signals and FMA
 declares the FMA signals and FMA. the FMA performs computation like
