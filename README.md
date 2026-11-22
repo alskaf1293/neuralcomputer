@@ -234,15 +234,15 @@ This core receives K such contributions in `back_rx[]` and adds them one at a ti
 At the clock edge, the FSM stores `mac_out` in `back_acc`. After all $K$ contributions,
 
 
-$$
-\text{back\_acc}=\sum_{k=0}^{K-1} \theta_{ki} \epsilon_k
-$$
+```math
+\text{back\_acc} = \sum_{k=0}^{K-1} \theta_{ki}\epsilon_k
+```
 
 `back_eff` is storage for the gated feedback. During `S_GATE_FEEDBACK`, the MAC multiplies the completed sum by the local activation derivative
 
-$$
+```math
 \text{back\_eff}=f'(x_{i,eff})\text{back\_acc}
-$$
+```
 <u>activity update</u>
 
 `sub_back_minus_eps` stores the direction of the activity update:
