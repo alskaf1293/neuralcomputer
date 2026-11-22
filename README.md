@@ -1,5 +1,5 @@
 
-# Predictive Coding Computer
+# Digital Predictive Coding Hardware
 
 As of November 2026, there is debate on whether predictive coding has computational advantages over backpropagation. The reality is that backpropagation has been extensively optimized on the CPU-GPU stack, and predictive coding requires simulating the inference phase which will always be less computationally efficient than backpropagation. It might be possible though, that the locality of predictive coding as well as other biologically plausible features could be exploited to produce computational advantages on neuromorphic hardware. Do such advantages exist?
 
@@ -71,6 +71,22 @@ klayout runs/network_serial/final/gds/pc_network_222.gds
 ```
 
 ![2 → 2 → 2 network layout viewed in KLayout](figures/klayout_1.png)
+
+# Repository Layout
+
+```text
+neuralcomputer/
+├── README.md       # Project overview and quick start
+├── flake.nix       # Development environment
+├── rtl/            # Hardware modules
+├── tb/             # RTL testbenches and teacher definitions
+├── scripts/        # Commands and Python experiments
+├── configs/        # LibreLane configurations
+├── figures/        # Images referenced by the README or paper
+├── HardFloat/      # Floating-point library
+├── runs/           # Local LibreLane results and required macros (ignored)
+└── tmp/            # Local LaTeX builds and experimental output (ignored)
+```
 
 # Architecture
 
