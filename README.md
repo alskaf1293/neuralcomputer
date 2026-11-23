@@ -78,7 +78,7 @@ The results are stored in `runs/`. We can view the result with klayout
 klayout runs/network_serial/final/gds/pc_network_222.gds
 ```
 
-![2 → 2 → 2 network layout viewed in KLayout](figures/klayout_1.png)
+![2 → 2 → 2 network layout viewed in KLayout](klayout_1.png)
 
 # Repository Layout
 
@@ -90,7 +90,7 @@ neuralcomputer/
 ├── tb/             # RTL testbenches and teacher definitions
 ├── scripts/        # Commands and Python experiments
 ├── configs/        # LibreLane configurations
-├── figures/        # Images referenced by the README or paper
+├── klayout_1.png   # Network layout shown in the README
 ├── HardFloat/      # Floating-point library
 ├── runs/           # Local LibreLane results and required macros (ignored)
 └── tmp/            # Local LaTeX builds and experimental output (ignored)
