@@ -372,9 +372,7 @@ module neuron_core #(
     output logic x_out [K],
 
     input logic learn_en,
-
-    // -- don't need beyond this line
-
+    
     input  logic                     x_set_en,
     input  logic [31:0]              x_obs_ieee
 );
@@ -702,7 +700,9 @@ module neuron_core #(
           // Prediction error.
           S_ERROR: begin
             eps_i <= mac_out;
-            st    <= S_SCALE_ERROR;
+            j     <= '0;
+            r     <= '0;
+            st    <= S_PREPARE_FEEDBACK;
           end
 
           // Prepare, exchange, and sum feedback.
@@ -738,7 +738,7 @@ module neuron_core #(
 
             if (r == K-1) begin
               j  <= '0;
-              st <= S_SCALE_BIAS_INCREMENT;
+              st <= S_GATE_FEEDBACK;
             end else begin
               r <= r + 1'b1;
             end
@@ -761,18 +761,14 @@ module neuron_core #(
             else
               x_i <= mac_out;
 
-            busy_o <= 1'b0;
-            done_o <= 1'b1;
-            st     <= S_IDLE;
+            st <= S_SCALE_ERROR;
           end
 
           // Weight update.
           S_SCALE_ERROR: begin
-            m_i      <= mac_out;
-            j        <= '0;
-            r        <= '0;
-            back_acc <= rec_zero;
-            st       <= S_PREPARE_FEEDBACK;
+            m_i <= mac_out;
+            j   <= '0;
+            st  <= S_SCALE_BIAS_INCREMENT;
           end
 
           S_SCALE_BIAS_INCREMENT: begin
@@ -784,9 +780,11 @@ module neuron_core #(
             if (learn_en && !(FREEZE_BIAS && (j == J)))
               theta[j] <= mac_out;
 
-            if (j == J_EFF-1)
-              st <= S_GATE_FEEDBACK;
-            else
+            if (j == J_EFF-1) begin
+              busy_o <= 1'b0;
+              done_o <= 1'b1;
+              st     <= S_IDLE;
+            end else
               j <= j + 1'b1;
           end
         endcase
