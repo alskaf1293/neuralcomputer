@@ -1,27 +1,8 @@
 
 # Digital Predictive Coding Hardware
 
-As of November 2026, there is debate on whether predictive coding has computational advantages over backpropagation. The reality is that backpropagation has been extensively optimized on the CPU-GPU stack, and predictive coding requires simulating the inference phase which will always be less computationally efficient than backpropagation. It might be possible though, that the locality of predictive coding as well as other biologically plausible features could be exploited to produce computational advantages on neuromorphic hardware. Do such advantages exist?
-
-The answer is YES. Predictive coding can be made in a way to compute gradients with much lower latency than backpropagation on traditional hardware that would scale to larger neural networks. This efficiency can be realized by making a few design choices, some of which differ from conventional hardware in many ways:
-
-- Online learning. This implementation uses the incremental predictive coding by Salvatori et al.: https://arxiv.org/pdf/2212.00720 which differs from the canonical implementation of predictive coding by merging the inference and the learning phase such that both can be executed in a loop, removing the need for a central controller that explicitly switches the network between inference and learning phases.
-
-- Every core owns its own finite state machine. The completion of a single cycle of all the FSM stages refers to a tick. A tick involves computing the $\Delta x$ and $\Delta \theta$ for that neuron, which involves the inference and learning phases of predictive coding
-
-- Every neuron owns its own MAC unit. The efficiencies come from the layout of the neural network. The clock cycles per tick depends on the maximum fan-in and fan-out across the network. Because neuron cores update concurrently, holding those connection counts fixed keeps the number of cycles per tick bounded as the network grows. Assume for the sake of argument that neuron $i$ in layer $l$ is connected to $J$ neurons in the layer above and $K$ neurons in the layer below. Then the total number of cycles per tick is a linear function of the max fan-in and fan-out
-
-```math
-O\left(J_{max}+K_{max} \right)
-```
-
-It is an interesting question whether the brain implements something similar.
-
-- A neuron in the predictive coding algorithm represents a physical core. Every core connects locally to it's neighboring cores. This architecture utilizes the locality of predictive coding. The core utilizes $2J$ connections, for receiving the activities $x_{j}$ from the layer above and sending signals back, as well as sending activities to the K neurons in the layer below and receiving them. In total, there are at least $2J + 2K$ pins that enter/exit each neuron core, plus additional ones for clock, reset pin, etc. The specific architecture details are prone to change, as adjustments are made to optimize the design further.
-
-- All cores operate in parallel. If a tick means that all the stages of the FSM complete in $X$ cycles, then for every $X$ cycles, all the neuron cores (besides the clamped ones) are updated with a step in the $\Delta x$ and $\Delta \theta$ gradient direction. Because memory and compute are co-located, there is no weight movement like in von Neumann architectures. This is where the efficiency comes from.
-
-- Mortality. A key feature of von Neumann machines are that hardware and software are separate, which allows instructions that are specified on one machine to be replicated on another machine. The software is separate from the hardware. This is a crucial property that makes general purposed digital machines different from the human brain. Mortality is realized in this system by first restricting the functionality to only implement the predictive coding update equations. In contrast to CPUs and GPUs, a core in this hardware only does one thing. While this might seem like it'd render the hardware useless due to its lack of flexibilty and progammability, it should be emphasized that the efficiencies comes about by making this tradeoff. The fact that the functionality is restricted to the predictive coding updates allows a core to be much more compact in its machinery. This provides also a concrete advantage over immortal systems: the activities and weights of a neuron core (except at the boundaries of a predictive coding network) do not have to be read out in order for the system to work. This allows a single PC neuron to be miniaturized further by reducing pin congestion and would allow them to be scaled further by saving area on silicon.
+This paper implements the result on arxiv: https://arxiv.org/pdf/2603.18066
+At the present moment only smaller sizes have been tested for. Predictive coding and neuromorphic computing will eventually be the future of artificial intelligence, but it can only happen through persistent work of scaling hardware up.
 
 # Quick Start
 
@@ -312,8 +293,3 @@ sequential circuitry
 This predictive coding hardware is one step towards a program I call the inference engine. The idea is that von Neumann intermediary can be removed from the computational system, achieving a computer that has is fully local, online, and parallel. The grander hypothesis is that achieving this would lead to a resolution of tasks considered difficult by Moravec's Paradox, which I have written about here: https://x.com/alskaf1293/status/2113007930845143244
 
 I also believe that this could be a step forward in a program that looks at alternative computing paradigms, including a reversion towards analog computing, active matter, or superconducting circuits. Analog circuits already seem much better suited for running predictive coding because PC is by nature a continuous time, energy-based dynamical system. I would not be surprised if a much more efficient way to run PC could be found on an analog circuit compared to digital CMOS. The problem is that the current computing ecosystem is built on digital CMOS, along with the software and EDA toolkits that currently exist. Analog can come in the future, but a first order proof of PC efficiencies would be much more feasible on digital hardware, hence this repository.
-
-# Paper
-
-This paper implements the result on arxiv: https://arxiv.org/pdf/2603.18066
-At the present moment only smaller sizes have been tested for. Predictive coding and neuromorphic computing will eventually be the future of artificial intelligence, but it can only happen through persistent work of scaling hardware up.
