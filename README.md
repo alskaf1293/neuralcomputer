@@ -37,7 +37,7 @@ $$
 
 ## RTL to GDS
 
-A PC neuron is represented by `neuron_core` RTL module in `nc_neuralcomputer.sv`. This is first hardened as a neuron macro, then used to create the full predictive coding network GDS files.
+A PC neuron is represented by `neuron_core` RTL module in `digitalpc.sv`. This is first hardened as a neuron macro, then used to create the full predictive coding network GDS files.
 
 LibreLane can reuse an existing run with the same tag. To start fresh, use a clean checkout or move the existing `runs/neuron_serial/` and `runs/network_serial/` directories before running these commands. The network configuration expects the neuron macro at `runs/neuron_serial/`.
 
@@ -79,7 +79,7 @@ neuralcomputer/
 
 # Architecture
 
-The network is built form three main modules in `rtl/nc_neuralcomputer.sv`:
+The network is built form three main modules in `rtl/digitalpc.sv`:
 
 - **`neuron_core`** implements one predictive-coding neuron. It stores its activity, incoming weights, and bias, and computes local prediction errors and updates.
 - **`pc_layer`** connects neuron cores into a layer.

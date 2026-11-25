@@ -25,7 +25,7 @@ def ieee(hex_value):
 
 
 def read_rtl_settings():
-    text = (ROOT / "rtl/nc_neuralcomputer.sv").read_text()
+    text = (ROOT / "rtl/digitalpc.sv").read_text()
 
     def constant(name):
         match = re.search(

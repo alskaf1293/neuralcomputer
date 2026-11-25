@@ -40,6 +40,7 @@
     "dir::HardFloat/source/recFNToIN.v",
     "dir::HardFloat/source/recFNToRecFN.v",
     "dir::HardFloat/source/8086-SSE/HardFloat_specialize.v",
-    "dir::rtl/nc_neuralcomputer.sv"
+    "dir::rtl/misc.sv",
+    "dir::rtl/digitalpc.sv"
   ]
 }

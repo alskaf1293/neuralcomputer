@@ -86,7 +86,8 @@ run_rtl() {
     "$ROOT/HardFloat/source/recFNToIN.v"
     "$ROOT/HardFloat/source/recFNToRecFN.v"
     "$ROOT/HardFloat/source/8086-SSE/HardFloat_specialize.v"
-    "$ROOT/rtl/nc_neuralcomputer.sv"
+    "$ROOT/rtl/misc.sv"
+    "$ROOT/rtl/digitalpc.sv"
   )
 
   check_env
